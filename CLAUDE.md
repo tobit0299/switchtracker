@@ -5,7 +5,7 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
 ## Stand
 
 - Repo: https://github.com/tobit0299/switchtracker (öffentlich), Deployment per GitHub Actions auf GitHub Pages: https://tobit0299.github.io/switchtracker/
-- Erste Version der App ist gebaut (Gastmodus, alle vier Reiter, JSON-Backup). Noch nicht umgesetzt: siehe „Offene Punkte“.
+- Erste Version der App ist gebaut (Gastmodus, alle vier Reiter, JSON-Backup). Details siehe „Funktionierende Features“, „Unvollständige Features“ und „Zukünftige Features“.
 - `spike/` ist der ursprüngliche Machbarkeitstest (18.10.2026) und gehört nicht zur App.
 - Anforderungen stammen teils aus einer Vorplanung mit einem anderen Werkzeug (WorkBuddy). Dessen Empfehlung chinesischer Kartendienste (Baidu/Tencent/AMap) wurde verworfen.
 
@@ -73,10 +73,41 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
 - **Ausgeschlossen:** direkte Nutzung von tile.openstreetmap.org und chinesische Kartendienste.
 - `navigator.storage.persist()` anfordern; JSON-Backup und CSV-Import/-Export.
 
-## Offene Punkte
+## Funktionierende Features
 
-1. Anmeldung und Synchronisation mit Dexie Cloud: geteilter Bereich für das Unternehmensverzeichnis, private Bereiche für Stellen. Fremdregistrierungen verhindern.
-2. Dokumente in Dexie Cloud zählen gegen 100 MB im kostenlosen Plan; ggf. nur lokal speichern oder Größe begrenzen.
-3. CSV-Import/-Export für Unternehmen und Stellen.
-4. Automatisches Datei-Backup über die File System Access API (bisher nur manueller JSON-Download).
-5. Fahrzeitfilter alternativ über Isochronen, falls die Matrix-Kontingente nicht reichen.
+Im Browser getestet am 19.10.2026 (Entwicklungsserver und Produktionsbuild):
+
+- Gastmodus mit dauerhaftem Hinweis; Daten in IndexedDB, dauerhafter Speicher wird angefordert.
+- Beispieldaten laden.
+- Adresssuche über Nominatim mit Cache und Drosselung (1/s); strukturierte Suche für Standorte in DE/NL/AT; Bundesland wird übernommen, auch bei Stadtstaaten (Berlin, Hamburg, Bremen, Wien).
+- Übersicht: Heimadresse wählen und weitere anlegen, Radiusfilter mit Kreis auf der Karte, kompakte Tabelle (Titel, Status, Frist) mit Filtern und Sortierung, Auswahl einer Stelle hebt den Marker hervor, Infokasten mit Luftlinie.
+- Fristen-Hervorhebung (überfällig rot, innerhalb von 7 Tagen orange).
+- Stellendetails öffnen, bearbeiten und speichern, inklusive Notizen und Relevanz.
+- Reiter „Stellen“: vollständige Tabelle mit allen Filtern und Sortierung.
+- Reiter „Unternehmen“: Tabelle mit Suche und Sortierung.
+- Produktionsbuild unter `/switchtracker/` mit Karte, MapLibre-Worker und Service Worker (offline-fähig).
+- Fahrzeit-Matrix und Route über OpenRouteService wurden im Machbarkeitstest (`spike/`) mit echtem Schlüssel bestätigt.
+
+## Unvollständige Features
+
+Umgesetzt, aber noch nicht getestet oder nur teilweise fertig:
+
+- **Fahrzeiten, Fahrzeitfilter und Routen in der App:** implementiert, aber noch nicht mit echtem ORS-Schlüssel in der App geprüft.
+- **Dokumentenablage:** Upload, Öffnen, Herunterladen und Löschen implementiert, aber nicht getestet (das Browser-Pane kann keine Dateien auswählen).
+- **Position korrigieren** (Marker ziehen): implementiert, nicht getestet.
+- **Unternehmensdialog:** Anlegen, Bearbeiten, Standorte, Dublettenhinweise und „Erneut suchen“ implementiert, nicht durchgeklickt.
+- **Backup:** JSON-Export und -Wiederherstellung, „Alle Daten löschen“ und „Geodaten-Cache leeren“ implementiert, nicht getestet. Backups sind nur manuell möglich.
+- **Profil:** Name und E-Mail werden gespeichert, haben aber bis zur Anmeldung keine Funktion.
+- **Deployment:** Workflow ist vorhanden; GitHub Pages muss im Repo auf „GitHub Actions“ gestellt werden, der erste Lauf wurde noch nicht geprüft.
+- **Mobile Ansicht:** Layout bricht unter 800 px um, ist aber nicht gezielt auf Smartphones getestet.
+
+## Zukünftige Features
+
+Nur auf ausdrücklichen Auftrag des Nutzers umsetzen, keine eigenständigen Umsetzungsversuche.
+
+- **PDF-Komprimierung und OCR beim Upload** von Dokumenten.
+- Anmeldung und Synchronisation mit Dexie Cloud: geteilter Bereich für das Unternehmensverzeichnis, private Bereiche für Stellen, Fremdregistrierungen verhindern. Dokumente zählen gegen 100 MB im kostenlosen Plan; ggf. nur lokal speichern oder Größe begrenzen.
+- CSV-Import/-Export für Unternehmen und Stellen.
+- Automatisches Datei-Backup über die File System Access API.
+- Optional: Fahrzeitfilter über Isochronen, falls die Matrix-Kontingente nicht reichen.
+- Optional: Offline-Karte über Protomaps/PMTiles.
