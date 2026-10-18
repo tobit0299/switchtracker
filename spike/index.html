@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Karten-Machbarkeitstest</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #5d6675;
+    --border: #d9dde4; --accent: #2563eb; --accent-text: #ffffff;
+    --ok: #15803d; --err: #b91c1c; --sel: #fef3c7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151b; --panel: #1b1f27; --text: #e6e9ef; --muted: #9aa3b2;
+      --border: #2e3440; --accent: #3b82f6; --accent-text: #ffffff;
+      --ok: #4ade80; --err: #f87171; --sel: #3a3220;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 system-ui, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  .layout { display: grid; grid-template-columns: 420px 1fr; height: 100vh; }
+  aside { overflow-y: auto; padding: 16px; background: var(--panel); border-right: 1px solid var(--border); }
+  #map { height: 100%; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.hint { color: var(--muted); margin: 0 0 12px; font-size: 13px; }
+  label { display: block; font-weight: 600; margin: 12px 0 4px; }
+  input, textarea { width: 100%; padding: 6px 8px; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+  textarea { height: 120px; resize: vertical; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+  .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  button { padding: 7px 12px; font: inherit; border: 0; border-radius: 6px; background: var(--accent); color: var(--accent-text); cursor: pointer; }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  button:disabled { opacity: .5; cursor: default; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 5px 4px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; white-space: nowrap; }
+  tbody tr { cursor: pointer; }
+  tbody tr.selected { background: var(--sel); }
+  #log { margin-top: 12px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; white-space: pre-wrap; color: var(--muted); max-height: 180px; overflow-y: auto; }
+  #log .ok { color: var(--ok); } #log .err { color: var(--err); }
+  .marker { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.3); cursor: pointer; }
+  .marker.home { background: #16a34a; width: 16px; height: 16px; }
+  .marker.selected { background: #f59e0b; width: 20px; height: 20px; }
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; grid-template-rows: auto 60vh; height: auto; }
+    aside { border-right: 0; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <h1>Karten-Machbarkeitstest</h1>
+    <p class="hint">Prüft drei Dinge: Adressen finden (Nominatim), Fahrzeiten ab der Heimadresse (OpenRouteService-Matrix) und eine gezeichnete Route (Klick auf eine Tabellenzeile).</p>
+
+    <label for="orsKey">OpenRouteService-API-Schlüssel</label>
+    <input id="orsKey" type="password" placeholder="nur lokal im Browser gespeichert" autocomplete="off">
+
+    <label for="home">Heimadresse</label>
+    <input id="home" value="Domkloster 4, 50667 Köln">
+
+    <label for="targets">Standorte (eine pro Zeile: Name; Adresse)</label>
+    <textarea id="targets">Rathaus München; Marienplatz 8, 80331 München
+Rathaus Hamburg; Rathausmarkt 1, 20095 Hamburg
+Rathaus Düsseldorf; Marktplatz 2, 40213 Düsseldorf
+Amsterdam (NL); Dam 1, 1012 JS Amsterdam
+Wien (AT); Stephansplatz 1, 1010 Wien</textarea>
+
+    <div class="buttons">
+      <button id="btnGeocode">1. Adressen suchen</button>
+      <button id="btnMatrix" disabled>2. Fahrzeiten berechnen</button>
+      <button id="btnClear" class="secondary">Cache leeren</button>
+    </div>
+
+    <table>
+      <thead><tr><th>Standort</th><th class="num">Luftlinie</th><th class="num">Fahrzeit</th><th class="num">Strecke</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <div id="log"></div>
+  </aside>
+  <div id="map"></div>
+</div>
+
+<script>
+const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
+const ORS = 'https://api.openrouteservice.org/v2';
+const CACHE_KEY = 'spike.geocache';
+
+const $ = id => document.getElementById(id);
+const state = { home: null, places: [], markers: [], homeMarker: null, selected: -1 };
+
+// ---------- Hilfsfunktionen ----------
+function log(msg, cls) {
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = new Date().toLocaleTimeString('de-DE') + '  ' + msg;
+  $('log').prepend(line);
+}
+function storageGet(key, fallback) {
+  try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; }
+}
+function storageSet(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* privater Modus */ }
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function haversineKm(a, b) {
+  const R = 6371, rad = d => d * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function fmtDuration(sec) {
+  if (sec == null) return '–';
+  const m = Math.round(sec / 60);
+  return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0');
+}
+const fmtKm = km => km == null ? '–' : km.toLocaleString('de-DE', { maximumFractionDigits: 0 }) + ' km';
+
+// ---------- Karte ----------
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://tiles.openfreemap.org/styles/liberty',
+  center: [10.4, 51.1],
+  zoom: 5.3,
+});
+map.addControl(new maplibregl.NavigationControl(), 'top-right');
+// Karte bei jeder Größenänderung des Containers neu vermessen (nicht nur bei Fenster-Resize)
+new ResizeObserver(() => map.resize()).observe($('map'));
+map.on('load', () => {
+  map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'route', type: 'line', source: 'route',
+    paint: { 'line-color': '#f59e0b', 'line-width': 5, 'line-opacity': .85 },
+    layout: { 'line-join': 'round', 'line-cap': 'round' } });
+});
+
+function makeMarker(place, cls, onClick) {
+  const el = document.createElement('div');
+  el.className = 'marker ' + cls;
+  el.title = place.name;
+  if (onClick) el.addEventListener('click', e => { e.stopPropagation(); onClick(); });
+  return new maplibregl.Marker({ element: el }).setLngLat([place.lon, place.lat])
+    .setPopup(new maplibregl.Popup({ offset: 12 }).setText(place.name + '\n' + place.address))
+    .addTo(map);
+}
+
+// ---------- Geocoding (Nominatim, max. 1 Anfrage/s, mit Cache) ----------
+async function geocode(address) {
+  const cache = storageGet(CACHE_KEY, {});
+  if (cache[address]) return { ...cache[address], cached: true };
+  const url = NOMINATIM + '?' + new URLSearchParams({ format: 'jsonv2', limit: '1', countrycodes: 'de,nl,at', q: address });
+  const res = await fetch(url, { headers: { 'Accept-Language': 'de' } });
+  if (!res.ok) throw new Error('Nominatim HTTP ' + res.status);
+  const data = await res.json();
+  await sleep(1100);
+  if (!data.length) return null;
+  const hit = { lat: +data[0].lat, lon: +data[0].lon, label: data[0].display_name };
+  cache[address] = hit;
+  storageSet(CACHE_KEY, cache);
+  return hit;
+}
+
+function parseTargets() {
+  return $('targets').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const i = l.indexOf(';');
+    return i < 0 ? { name: l, address: l } : { name: l.slice(0, i).trim(), address: l.slice(i + 1).trim() };
+  });
+}
+
+async function runGeocode() {
+  $('btnGeocode').disabled = true; $('btnMatrix').disabled = true;
+  state.markers.forEach(m => m.remove()); state.markers = [];
+  if (state.homeMarker) state.homeMarker.remove();
+  clearRoute(); state.selected = -1;
+  try {
+    const homeAddr = $('home').value.trim();
+    const h = await geocode(homeAddr);
+    if (!h) { log('Heimadresse nicht gefunden: ' + homeAddr, 'err'); return; }
+    state.home = { name: 'Zuhause', address: homeAddr, ...h };
+    state.homeMarker = makeMarker(state.home, 'home');
+    log('Heimadresse gefunden' + (h.cached ? ' (Cache)' : '') + ': ' + h.label, 'ok');
+
+    state.places = [];
+    for (const t of parseTargets()) {
+      const g = await geocode(t.address);
+      if (!g) { log('Nicht gefunden: ' + t.address, 'err'); continue; }
+      const p = { ...t, ...g, airKm: haversineKm(state.home, g), durationS: null, distanceKm: null };
+      state.places.push(p);
+      log('Gefunden' + (g.cached ? ' (Cache)' : '') + ': ' + t.name + ' → ' + g.label, 'ok');
+    }
+    state.places.forEach((p, i) => state.markers.push(makeMarker(p, '', () => selectPlace(i))));
+    fitAll();
+    renderTable();
+    $('btnMatrix').disabled = state.places.length === 0;
+  } catch (e) {
+    log('Fehler beim Geocoding: ' + e.message, 'err');
+  } finally {
+    $('btnGeocode').disabled = false;
+  }
+}
+
+function fitAll() {
+  const b = new maplibregl.LngLatBounds();
+  [state.home, ...state.places].forEach(p => b.extend([p.lon, p.lat]));
+  map.fitBounds(b, { padding: 60, maxZoom: 12 });
+}
+
+// ---------- OpenRouteService ----------
+function orsKey() {
+  const k = $('orsKey').value.trim();
+  if (!k) throw new Error('Bitte zuerst den OpenRouteService-Schlüssel eintragen.');
+  return k;
+}
+async function orsPost(path, body) {
+  const res = await fetch(ORS + path, {
+    method: 'POST',
+    headers: { 'Authorization': orsKey(), 'Content-Type': 'application/json', 'Accept': 'application/json, application/geo+json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error('ORS HTTP ' + res.status + ': ' + (data.error?.message || data.error || JSON.stringify(data)));
+  return data;
+}
+
+async function runMatrix() {
+  $('btnMatrix').disabled = true;
+  try {
+    const locations = [state.home, ...state.places].map(p => [p.lon, p.lat]);
+    const data = await orsPost('/matrix/driving-car', {
+      locations, sources: [0], destinations: state.places.map((_, i) => i + 1),
+      metrics: ['duration', 'distance'], units: 'km',
+    });
+    state.places.forEach((p, i) => {
+      p.durationS = data.durations[0][i];
+      p.distanceKm = data.distances[0][i];
+      if (p.durationS == null) log('Keine Route möglich: ' + p.name, 'err');
+    });
+    log('Fahrzeit-Matrix berechnet: ' + state.places.length + ' Ziele in einer Anfrage', 'ok');
+    renderTable();
+  } catch (e) {
+    log(e.message, 'err');
+  } finally {
+    $('btnMatrix').disabled = false;
+  }
+}
+
+function clearRoute() {
+  const src = map.getSource && map.getSource('route');
+  if (src) src.setData({ type: 'FeatureCollection', features: [] });
+}
+
+async function selectPlace(i) {
+  state.selected = i;
+  state.markers.forEach((m, j) => m.getElement().classList.toggle('selected', j === i));
+  renderTable();
+  const p = state.places[i];
+  try {
+    const data = await orsPost('/directions/driving-car/geojson', {
+      coordinates: [[state.home.lon, state.home.lat], [p.lon, p.lat]],
+    });
+    map.getSource('route').setData(data);
+    const s = data.features[0].properties.summary;
+    log('Route zu ' + p.name + ': ' + fmtDuration(s.duration) + ', ' + fmtKm(s.distance / 1000), 'ok');
+    const b = new maplibregl.LngLatBounds();
+    data.features[0].geometry.coordinates.forEach(c => b.extend(c));
+    map.fitBounds(b, { padding: 60 });
+  } catch (e) {
+    clearRoute();
+    log('Route zu ' + p.name + ' nicht verfügbar: ' + e.message, 'err');
+  }
+}
+
+// ---------- Tabelle ----------
+function renderTable() {
+  const tbody = $('rows');
+  tbody.replaceChildren(...state.places.map((p, i) => {
+    const tr = document.createElement('tr');
+    if (i === state.selected) tr.className = 'selected';
+    tr.title = p.label;
+    [[p.name, ''], [fmtKm(p.airKm), 'num'], [fmtDuration(p.durationS), 'num'], [fmtKm(p.distanceKm), 'num']]
+      .forEach(([text, cls]) => { const td = document.createElement('td'); td.textContent = text; td.className = cls; tr.append(td); });
+    tr.addEventListener('click', () => selectPlace(i));
+    return tr;
+  }));
+}
+
+// ---------- Start ----------
+$('orsKey').value = storageGet('spike.orsKey', '');
+$('orsKey').addEventListener('change', () => storageSet('spike.orsKey', $('orsKey').value.trim()));
+$('btnGeocode').addEventListener('click', runGeocode);
+$('btnMatrix').addEventListener('click', runMatrix);
+$('btnClear').addEventListener('click', () => { storageSet(CACHE_KEY, {}); log('Geocoding-Cache geleert'); });
+</script>
+</body>
+</html>
