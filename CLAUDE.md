@@ -61,7 +61,9 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
    - Linke Spalte, von oben: Heimadresse (Auswahl + „Adresse“), Kopfzeile „Stellen“ mit Knöpfen „Alle Filter zurücksetzen“ und „Spalten auswählen“, Radius (km Luftlinie), Tabellenfilter (Suche, Status, Frist), kompakte Tabelle.
    - Rechte Spalte: Karte über die volle Höhe. Die Trennkante zwischen Tabelle und Karte ist ziehbar (Breite in localStorage).
    - Spalten der kompakten Tabelle per Popup wählbar und per Ziehen sortierbar (Standard: Titel, Status, Frist), gespeichert als Einstellung `overviewColumns`.
+   - Jede Zeile hat eine laufende Nummer (Spalte „#“, 1–n in aktueller Filterung und Sortierung); dieselbe Nummer steht im Marker auf der Karte. Mehrere Stellen am selben Standort: bis zu drei Nummern, sonst z. B. „2, 5 +3“. Stellen ohne Kartenposition haben eine umrandete Nummer.
    - Klick auf eine Stelle: Standort wird auf der Karte hervorgehoben. Kein „Neue Stelle“-Knopf hier (nur im Reiter „Stellen“).
+   - Die Karte passt sich an neu hinzukommende Punkte an, bis der Nutzer sie selbst verschiebt oder zoomt.
    - „Details“ (Augen-Symbol): vollständige Stelleninformationen, Notizfeld und Dokumentenablage.
 2. **Stellen:** vollständige Tabelle mit allen Feldern („Relevanz Stelle“, „Bewertung Unternehmen“), Filter, „Neue Stelle“.
 3. **Unternehmen:** vollständige Tabelle mit Unternehmen und Standorten.
@@ -83,7 +85,7 @@ Im Browser getestet am 19.10.2026 (Entwicklungsserver und Produktionsbuild); Üb
 - Gastmodus mit dauerhaftem Hinweis; Daten in IndexedDB, dauerhafter Speicher wird angefordert.
 - Beispieldaten laden.
 - Adresssuche über Nominatim mit Cache und Drosselung (1/s); strukturierte Suche für Standorte in DE/NL/AT; Bundesland wird übernommen, auch bei Stadtstaaten (Berlin, Hamburg, Bremen, Wien).
-- Übersicht: Heimadresse wählen und weitere anlegen, Radiusfilter mit Kreis auf der Karte, kompakte Tabelle mit Filtern und Sortierung, „Alle Filter zurücksetzen“, Spaltenauswahl mit Umsortieren (Ziehen und Alt + Pfeiltasten), ziehbare Kartenkante, Auswahl einer Stelle hebt den Marker hervor, Infokasten mit Luftlinie.
+- Übersicht: Heimadresse wählen und weitere anlegen, Radiusfilter mit Kreis auf der Karte, kompakte Tabelle mit Filtern und Sortierung, „Alle Filter zurücksetzen“, Spaltenauswahl mit Umsortieren (Ziehen und Alt + Pfeiltasten), ziehbare Kartenkante, nummerierte Marker passend zu den Tabellenzeilen, Auswahl einer Stelle hebt den Marker hervor, Infokasten mit Luftlinie.
 - Einstellungen über das Zahnrad oben rechts; „Position korrigieren“ standardmäßig ausgeblendet, in den Einstellungen einschaltbar.
 - Carbon-Design in hell und dunkel (folgt der Systemeinstellung).
 - Fristen-Hervorhebung (überfällig rot, innerhalb von 7 Tagen orange).

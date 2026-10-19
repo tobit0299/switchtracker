@@ -104,14 +104,21 @@
   }
 
   // ---------- Karte ----------
+  /** laufende Nummer jeder sichtbaren Zeile (1–n in aktueller Filterung und Sortierung) */
+  const rowNumber = $derived(new Map(visible.map((r, i) => [r.job.id, i + 1])));
+
   const points = $derived.by(() => {
-    const byLoc = new Map<string, MapPoint>();
+    const byLoc = new Map<string, MapPoint & { nums: number[] }>();
     for (const r of visible) {
       if (!r.location || !r.coord) continue;
+      const n = rowNumber.get(r.job.id)!;
       const p = byLoc.get(r.location.id);
-      if (p) p.subtitle += `\n${r.job.title}`;
-      else byLoc.set(r.location.id, { id: r.location.id, coord: r.coord, title: r.company?.name ?? r.location.city, subtitle: r.job.title });
+      if (p) { p.subtitle += `
+${n}. ${r.job.title}`; p.nums.push(n); }
+      else byLoc.set(r.location.id, { id: r.location.id, coord: r.coord, title: r.company?.name ?? r.location.city, subtitle: `${n}. ${r.job.title}`, label: '', nums: [n] });
     }
+    // mehrere Stellen am selben Standort: bis zu drei Nummern, sonst „2, 5 +3“
+    for (const p of byLoc.values()) p.label = p.nums.length <= 3 ? p.nums.join(', ') : `${p.nums.slice(0, 2).join(', ')} +${p.nums.length - 2}`;
     return [...byLoc.values()];
   });
 
@@ -208,6 +215,7 @@
       <table class="data">
         <thead>
           <tr>
+            <th class="nr" title="Nummer des Markers auf der Karte">#</th>
             {#each columns as c (c.key)}
               <th class="sortable" class:num={c.num} aria-sort={ariaSort(c.key)} onclick={() => sortBy(c.key)}>
                 {c.label}{sortKey === c.key ? (sortAsc ? ' ▲' : ' ▼') : ''}
@@ -219,6 +227,7 @@
         <tbody>
           {#each visible as r (r.job.id)}
             <tr class:selected={r.job.id === ui.selectedJobId} onclick={() => select(r.job.id)} ondblclick={() => openDetails(r)}>
+              <td class="nr"><span class="pin" class:nopin={!r.coord}>{rowNumber.get(r.job.id)}</span></td>
               {#each columns as c (c.key)}
                 <td class:num={c.num}>
                   <JobCell row={r} col={c.key} subline={c.key === 'title' && !store.overviewColumns.includes('company')} />
@@ -229,7 +238,7 @@
               </td>
             </tr>
           {:else}
-            <tr><td colspan={columns.length + 1} class="muted empty">
+            <tr><td colspan={columns.length + 2} class="muted empty">
               {store.jobs.length ? 'Keine Stelle passt zu den Filtern.' : 'Noch keine Stellen. Lege im Reiter „Stellen“ eine neue an oder lade in den Einstellungen die Beispieldaten.'}
             </td></tr>
           {/each}
@@ -327,6 +336,14 @@
   /* kompakte Tabelle: etwas weniger Innenabstand als die volle Carbon-Tabelle */
   .table-wrap :global(th), .table-wrap :global(td) { padding-left: 12px; padding-right: 12px; }
   .table-wrap :global(td.act) { width: 1px; padding: 0 4px; }
+  .table-wrap :global(th.nr), .table-wrap :global(td.nr) { width: 1px; padding: 0 0 0 12px; text-align: center; }
+  /* gleiche Optik wie der Marker auf der Karte */
+  .pin {
+    display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 5px;
+    border-radius: 11px; background: #0f62fe; color: #fff; font-size: 11px; font-weight: 600;
+  }
+  .pin.nopin { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--border-strong); }
+  tr.selected .pin:not(.nopin) { background: #ff832b; color: #161616; }
   .empty { padding: 24px 16px; text-align: center; cursor: default; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .splitter {
