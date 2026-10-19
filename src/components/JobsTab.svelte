@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { deadlineClass, fmtDate, fmtDuration, fmtKm } from '../lib/format';
+  import Add from 'carbon-icons-svelte/lib/Add.svelte';
+  import FilterRemove from 'carbon-icons-svelte/lib/FilterRemove.svelte';
+  import { COLUMNS, columnByKey, compareRows, type ColumnKey } from '../lib/columns';
   import { emptyJob } from '../lib/repo';
   import { prefs, store, type JobRow } from '../lib/store.svelte';
-  import { COUNTRIES, STATUSES, WORK_MODELS, countryLabel, statusLabel, workModelLabel } from '../lib/types';
+  import { COUNTRIES, STATUSES, WORK_MODELS } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
-  import StarRating from './StarRating.svelte';
+  import JobCell from './JobCell.svelte';
 
   // ---------- Filter ----------
   let q = $state('');
@@ -38,42 +40,15 @@
   }
 
   // ---------- Sortierung ----------
-  type SortKey = 'title' | 'company' | 'city' | 'state' | 'status' | 'relevance' | 'rating' | 'deadline' | 'followUp' | 'air' | 'travel';
-  let sortKey = $state<SortKey>('deadline');
+  let sortKey = $state<ColumnKey>('deadline');
   let sortAsc = $state(true);
-  const statusOrder = new Map(STATUSES.map((s, i) => [s.value, i]));
 
-  function sortValue(r: JobRow, k: SortKey): string | number | null {
-    switch (k) {
-      case 'title': return r.job.title;
-      case 'company': return r.company?.name ?? null;
-      case 'city': return r.location?.city ?? null;
-      case 'state': return r.state || null;
-      case 'status': return statusOrder.get(r.job.status) ?? 0;
-      case 'relevance': return r.job.relevance || null;
-      case 'rating': return r.company?.rating || null;
-      case 'deadline': return r.job.deadline || null;
-      case 'followUp': return r.job.followUp || null;
-      case 'air': return r.airKm;
-      case 'travel': return r.travel?.reachable ? r.travel.durationS : null;
-    }
-  }
+  const visible = $derived(store.rows.filter(matches).sort((a, b) => compareRows(a, b, sortKey, sortAsc)));
 
-  const visible = $derived.by(() => {
-    const dir = sortAsc ? 1 : -1;
-    return store.rows.filter(matches).sort((a, b) => {
-      const va = sortValue(a, sortKey), vb = sortValue(b, sortKey);
-      if (va == null) return vb == null ? 0 : 1; // leere Werte immer ans Ende
-      if (vb == null) return -1;
-      return dir * (typeof va === 'number' ? va - (vb as number) : va.localeCompare(vb as string, 'de'));
-    });
-  });
-
-  function sortBy(k: SortKey) {
+  function sortBy(k: ColumnKey) {
     if (sortKey === k) sortAsc = !sortAsc;
-    else { sortKey = k; sortAsc = !['relevance', 'rating'].includes(k); }
+    else { sortKey = k; sortAsc = !columnByKey.get(k)?.descFirst; }
   }
-  const arrow = (k: SortKey) => (sortKey === k ? (sortAsc ? ' ▲' : ' ▼') : '');
 
   function reset() {
     q = ''; status = 'open'; workModel = ''; industry = ''; minRating = 0; minRelevance = 0; bundesland = ''; country = ''; maxMinutes = null;
@@ -81,25 +56,12 @@
 
   const open = (r: JobRow) => (ui.jobDialog = { job: $state.snapshot(r.job), isNew: false });
 
-  const columns: { key: SortKey; label: string; num?: boolean }[] = [
-    { key: 'title', label: 'Titel' },
-    { key: 'company', label: 'Unternehmen' },
-    { key: 'city', label: 'Ort' },
-    { key: 'state', label: 'Bundesland' },
-    { key: 'status', label: 'Status' },
-    { key: 'relevance', label: 'Relevanz' },
-    { key: 'rating', label: 'Bewertung' },
-    { key: 'deadline', label: 'Frist', num: true },
-    { key: 'followUp', label: 'Wiedervorlage', num: true },
-    { key: 'air', label: 'Luftlinie', num: true },
-    { key: 'travel', label: 'Fahrzeit', num: true },
-  ];
 </script>
 
 <div class="page">
   <div class="row head">
     <h2 class="grow">Stellen <span class="muted small">{visible.length} von {store.jobs.length}</span></h2>
-    <button onclick={() => (ui.jobDialog = { job: emptyJob(), isNew: true })}>+ Neue Stelle</button>
+    <button onclick={() => (ui.jobDialog = { job: emptyJob(), isNew: true })}><Add size={16} /> Neue Stelle</button>
   </div>
 
   <div class="filters card">
@@ -123,13 +85,13 @@
         {#each industries as i (i)}<option value={i}>{i}</option>{/each}
       </select>
     </label>
-    <label class="field">Bewertung ab
+    <label class="field">Bewertung Unternehmen ab
       <select bind:value={minRating}>
         <option value={0}>Alle</option>
         {#each [1, 2, 3, 4, 5] as n (n)}<option value={n}>{'★'.repeat(n)}</option>{/each}
       </select>
     </label>
-    <label class="field">Relevanz ab
+    <label class="field">Relevanz Stelle ab
       <select bind:value={minRelevance}>
         <option value={0}>Alle</option>
         {#each [1, 2, 3, 4, 5] as n (n)}<option value={n}>{'★'.repeat(n)}</option>{/each}
@@ -151,42 +113,29 @@
       Fahrzeit bis (min)
       <input type="number" min="5" step="5" placeholder="alle" bind:value={maxMinutes} disabled={!prefs.orsKey} />
     </label>
-    <button class="secondary reset" onclick={reset}>Filter zurücksetzen</button>
+    <button class="ghost reset" onclick={reset} title="Alle Filter zurücksetzen"><FilterRemove size={16} /> Filter zurücksetzen</button>
   </div>
 
   <div class="table-wrap card">
     <table class="data">
       <thead>
         <tr>
-          {#each columns as c (c.key)}
-            <th class="sortable" class:num={c.num} onclick={() => sortBy(c.key)}>{c.label}{arrow(c.key)}</th>
+          {#each COLUMNS as c (c.key)}
+            <th class="sortable" class:num={c.num} aria-sort={sortKey === c.key ? (sortAsc ? 'ascending' : 'descending') : 'none'} onclick={() => sortBy(c.key)}>
+              {c.label}{sortKey === c.key ? (sortAsc ? ' ▲' : ' ▼') : ''}
+            </th>
           {/each}
-          <th>Arbeitsmodell</th>
-          <th>Branche</th>
         </tr>
       </thead>
       <tbody>
         {#each visible as r (r.job.id)}
           <tr onclick={() => open(r)}>
-            <td class="title">
-              {r.job.title || '(ohne Titel)'}
-              {#if r.job.url}<a href={r.job.url} target="_blank" rel="noopener noreferrer" onclick={e => e.stopPropagation()} title="Stellenanzeige öffnen">↗</a>{/if}
-            </td>
-            <td>{r.company?.name ?? ''}</td>
-            <td>{r.location ? `${r.location.city}${r.location.country !== 'DE' ? ` (${countryLabel(r.location.country)})` : ''}` : ''}</td>
-            <td>{r.state}</td>
-            <td><span class="badge s-{r.job.status}">{statusLabel(r.job.status)}</span></td>
-            <td><StarRating value={r.job.relevance} readonly label="Relevanz" /></td>
-            <td>{#if r.company}<StarRating value={r.company.rating} readonly />{/if}</td>
-            <td class="num {deadlineClass(r.job.deadline)}">{fmtDate(r.job.deadline)}</td>
-            <td class="num {deadlineClass(r.job.followUp)}">{fmtDate(r.job.followUp)}</td>
-            <td class="num">{r.location ? fmtKm(r.airKm) : ''}</td>
-            <td class="num">{r.travel ? (r.travel.reachable ? fmtDuration(r.travel.durationS) : 'keine Route') : r.location ? '–' : ''}</td>
-            <td>{workModelLabel(r.job.workModel)}</td>
-            <td>{r.company?.industry ?? ''}</td>
+            {#each COLUMNS as c (c.key)}
+              <td class:num={c.num} class:title={c.key === 'title'}><JobCell row={r} col={c.key} /></td>
+            {/each}
           </tr>
         {:else}
-          <tr><td colspan={columns.length + 2} class="muted empty">Keine Stelle passt zu den Filtern.</td></tr>
+          <tr><td colspan={COLUMNS.length} class="muted empty">Keine Stelle passt zu den Filtern.</td></tr>
         {/each}
       </tbody>
     </table>
@@ -195,12 +144,11 @@
 </div>
 
 <style>
-  .page { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-  .filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; align-items: end; padding: 12px; }
+  .page { padding: 16px; display: flex; flex-direction: column; gap: 16px; height: 100%; }
+  .filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px; align-items: end; }
   .search { grid-column: 1 / -1; }
-  .table-wrap { padding: 0; overflow: auto; max-height: calc(100vh - 330px); min-height: 200px; }
-  .title { font-weight: 600; min-width: 180px; }
-  .title a { text-decoration: none; margin-left: 4px; }
+  .table-wrap { padding: 0; overflow: auto; flex: 1; min-height: 240px; }
+  .title { min-width: 200px; }
   .empty { padding: 24px; text-align: center; cursor: default; }
   td { white-space: nowrap; }
   td.title { white-space: normal; }

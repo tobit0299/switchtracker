@@ -21,7 +21,9 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
 - `src/lib/store.svelte.ts`: reaktiver Datenstand aus liveQuerys, abgeleitete Werte (`rows` = Stellen mit Unternehmen, Standort, Luftlinie, Fahrzeit). Lokale Werte wie der ORS-Schlüssel in `prefs` (localStorage).
 - `src/lib/repo.ts`: alle Schreibzugriffe. Komponenten schreiben nie direkt in Dexie.
 - `src/lib/geo/keys.ts`: Adressnormalisierung, Cache-Schlüssel, Luftlinie. `src/lib/geo/services.svelte.ts`: Nominatim-Warteschlange (1/s), ORS-Matrix und -Routen.
-- `src/components/`: ein Reiter je Datei plus `JobDialog`, `CompanyDialog`, `MapView`, `HomeBar`, `StarRating`.
+- `src/components/`: ein Reiter je Datei plus `JobDialog`, `CompanyDialog`, `MapView`, `HomeBar`, `StarRating`, `ColumnPicker`, `JobCell`.
+- `src/lib/columns.ts`: gemeinsame Spaltendefinitionen und Sortierung beider Stellentabellen; `JobCell` rendert eine Zelle.
+- Design nach IBM Carbon (Themes g10/g100) als eigene CSS-Tokens in `src/app.css`, Schrift IBM Plex Sans (`@fontsource`), Icons aus `carbon-icons-svelte` (Import je Icon aus `carbon-icons-svelte/lib/…`). Die Carbon-Komponentenbibliothek wird bewusst nicht genutzt.
 - Svelte 5 mit Runes. An Dexie nur Snapshots übergeben (`$state.snapshot`), keine Proxys.
 - MapLibre-Worker wird über `setWorkerUrl` mit einem `?url`-Import gesetzt, sonst findet Vite ihn nicht.
 
@@ -56,13 +58,14 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
 ## Oberfläche (Reiter)
 
 1. **Übersicht (Hauptreiter)**
-   - Oben: Auswahl/Eingabe der Heimadresse (mehrere speicherbar) und daneben ein Eingabefeld für den Suchradius (Luftlinie, km).
-   - Karte und kompakte Stellentabelle mit nur Titel, Pipeline-Status und Frist; Filter direkt in der Tabelle.
-   - Klick auf eine Stelle: Standort wird auf der Karte hervorgehoben.
-   - „Details“: vollständige Stelleninformationen, Notizfeld und Dokumentenablage.
-2. **Stellen:** vollständige Tabelle mit allen Feldern.
+   - Linke Spalte, von oben: Heimadresse (Auswahl + „Adresse“), Kopfzeile „Stellen“ mit Knöpfen „Alle Filter zurücksetzen“ und „Spalten auswählen“, Radius (km Luftlinie), Tabellenfilter (Suche, Status, Frist), kompakte Tabelle.
+   - Rechte Spalte: Karte über die volle Höhe. Die Trennkante zwischen Tabelle und Karte ist ziehbar (Breite in localStorage).
+   - Spalten der kompakten Tabelle per Popup wählbar und per Ziehen sortierbar (Standard: Titel, Status, Frist), gespeichert als Einstellung `overviewColumns`.
+   - Klick auf eine Stelle: Standort wird auf der Karte hervorgehoben. Kein „Neue Stelle“-Knopf hier (nur im Reiter „Stellen“).
+   - „Details“ (Augen-Symbol): vollständige Stelleninformationen, Notizfeld und Dokumentenablage.
+2. **Stellen:** vollständige Tabelle mit allen Feldern („Relevanz Stelle“, „Bewertung Unternehmen“), Filter, „Neue Stelle“.
 3. **Unternehmen:** vollständige Tabelle mit Unternehmen und Standorten.
-4. **Einstellungen:** ORS-Schlüssel, Profilinformationen, Heimadressen verwalten, Backup.
+4. **Einstellungen:** kein Reiter, sondern Zahnrad oben rechts. ORS-Schlüssel, Profil, Heimadressen, Karte („Position korrigieren“ an/aus, Standard aus), Backup.
 
 ## Technische Richtung
 
@@ -75,12 +78,14 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
 
 ## Funktionierende Features
 
-Im Browser getestet am 19.10.2026 (Entwicklungsserver und Produktionsbuild):
+Im Browser getestet am 19.10.2026 (Entwicklungsserver und Produktionsbuild); Überarbeitung (Carbon-Design, Spaltenauswahl, Zahnrad) im Entwicklungsserver geprüft:
 
 - Gastmodus mit dauerhaftem Hinweis; Daten in IndexedDB, dauerhafter Speicher wird angefordert.
 - Beispieldaten laden.
 - Adresssuche über Nominatim mit Cache und Drosselung (1/s); strukturierte Suche für Standorte in DE/NL/AT; Bundesland wird übernommen, auch bei Stadtstaaten (Berlin, Hamburg, Bremen, Wien).
-- Übersicht: Heimadresse wählen und weitere anlegen, Radiusfilter mit Kreis auf der Karte, kompakte Tabelle (Titel, Status, Frist) mit Filtern und Sortierung, Auswahl einer Stelle hebt den Marker hervor, Infokasten mit Luftlinie.
+- Übersicht: Heimadresse wählen und weitere anlegen, Radiusfilter mit Kreis auf der Karte, kompakte Tabelle mit Filtern und Sortierung, „Alle Filter zurücksetzen“, Spaltenauswahl mit Umsortieren (Ziehen und Alt + Pfeiltasten), ziehbare Kartenkante, Auswahl einer Stelle hebt den Marker hervor, Infokasten mit Luftlinie.
+- Einstellungen über das Zahnrad oben rechts; „Position korrigieren“ standardmäßig ausgeblendet, in den Einstellungen einschaltbar.
+- Carbon-Design in hell und dunkel (folgt der Systemeinstellung).
 - Fristen-Hervorhebung (überfällig rot, innerhalb von 7 Tagen orange).
 - Stellendetails öffnen, bearbeiten und speichern, inklusive Notizen und Relevanz.
 - Reiter „Stellen“: vollständige Tabelle mit allen Filtern und Sortierung.
@@ -94,7 +99,7 @@ Umgesetzt, aber noch nicht getestet oder nur teilweise fertig:
 
 - **Fahrzeiten, Fahrzeitfilter und Routen in der App:** implementiert, aber noch nicht mit echtem ORS-Schlüssel in der App geprüft.
 - **Dokumentenablage:** Upload, Öffnen, Herunterladen und Löschen implementiert, aber nicht getestet (das Browser-Pane kann keine Dateien auswählen).
-- **Position korrigieren** (Marker ziehen): implementiert, nicht getestet.
+- **Position korrigieren** (Marker ziehen): implementiert, standardmäßig aus, das Verschieben selbst ist nicht getestet.
 - **Unternehmensdialog:** Anlegen, Bearbeiten, Standorte, Dublettenhinweise und „Erneut suchen“ implementiert, nicht durchgeklickt.
 - **Backup:** JSON-Export und -Wiederherstellung, „Alle Daten löschen“ und „Geodaten-Cache leeren“ implementiert, nicht getestet. Backups sind nur manuell möglich.
 - **Profil:** Name und E-Mail werden gespeichert, haben aber bis zur Anmeldung keine Funktion.

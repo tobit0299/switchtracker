@@ -22,8 +22,8 @@
 {/if}
 
 <style>
-  .stars { color: var(--border); white-space: nowrap; letter-spacing: 1px; }
+  .stars { color: var(--border-strong); white-space: nowrap; letter-spacing: 1px; }
   .on { color: var(--star); }
-  .edit button { background: none; border: 0; padding: 0 1px; font-size: 20px; line-height: 1; color: var(--border); }
+  .edit button { background: none; border: 0; padding: 0 1px; min-height: 0; font-size: 20px; line-height: 1; color: var(--border-strong); }
   .edit button.on { color: var(--star); }
 </style>

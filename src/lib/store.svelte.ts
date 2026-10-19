@@ -1,4 +1,5 @@
 import { liveQuery } from 'dexie';
+import { columnByKey, DEFAULT_OVERVIEW_COLUMNS, type ColumnKey } from './columns';
 import { db, geoDb } from './db';
 import { addressKey, haversineKm, locationAddress, travelKey } from './geo/keys';
 import type { Company, Coord, Geocode, Home, Job, Location, Profile, Travel } from './types';
@@ -28,6 +29,14 @@ class Store {
   /** Suchradius in km, null = kein Radiusfilter */
   radiusKm = $derived((this.settings.radiusKm as number | null | undefined) ?? null);
   profile = $derived((this.settings.profile as Profile | undefined) ?? { name: '', email: '' });
+  /** „Position korrigieren“ (Marker ziehen) ist standardmäßig aus */
+  allowPositionCorrection = $derived(this.settings.allowPositionCorrection === true);
+  /** sichtbare Spalten der kompakten Tabelle in der Übersicht, in Anzeigereihenfolge */
+  overviewColumns = $derived.by<ColumnKey[]>(() => {
+    const v = this.settings.overviewColumns;
+    const valid = Array.isArray(v) ? (v as ColumnKey[]).filter(k => columnByKey.has(k)) : [];
+    return valid.length ? valid : DEFAULT_OVERVIEW_COLUMNS;
+  });
 
   coordForAddress(address: string): Coord | null {
     const g = this.geocodeByKey.get(addressKey(address));

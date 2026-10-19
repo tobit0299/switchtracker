@@ -1,4 +1,6 @@
 import { mount } from 'svelte';
+import '@fontsource/ibm-plex-sans/latin-400.css';
+import '@fontsource/ibm-plex-sans/latin-600.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './app.css';
 import App from './App.svelte';

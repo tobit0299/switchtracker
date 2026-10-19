@@ -92,6 +92,8 @@
 </script>
 
 <div class="page">
+  <h1>Einstellungen</h1>
+
   <section class="card">
     <h2>OpenRouteService-Schlüssel</h2>
     <p class="muted small">
@@ -163,6 +165,22 @@
   </section>
 
   <section class="card">
+    <h2>Karte</h2>
+    <label class="row check">
+      <input
+        type="checkbox"
+        checked={store.allowPositionCorrection}
+        onchange={e => setSetting('allowPositionCorrection', e.currentTarget.checked)}
+      />
+      „Position korrigieren“ anbieten
+    </label>
+    <p class="muted small">
+      Zeigt in der Übersicht einen Knopf, mit dem sich der Marker eines Standorts von Hand verschieben lässt,
+      falls die Adresssuche ihn falsch platziert hat. Korrigierte Positionen werden nie automatisch überschrieben.
+    </p>
+  </section>
+
+  <section class="card">
     <h2>Backup</h2>
     <p class="muted small">
       Sichert Unternehmen, Stellen, Dokumente, Heimadressen, Einstellungen und berechnete Geodaten in einer JSON-Datei.
@@ -209,6 +227,8 @@
 
 <style>
   .page { padding: 16px; display: flex; flex-direction: column; gap: 16px; max-width: 900px; }
+  h1 { font-size: 28px; font-weight: 400; margin: 8px 0; }
+  .check { gap: 12px; cursor: pointer; }
   section { display: flex; flex-direction: column; gap: 10px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
   .homes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }

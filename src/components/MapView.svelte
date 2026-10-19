@@ -59,12 +59,12 @@
     m.addControl(new maplibregl.NavigationControl(), 'top-right');
     m.on('load', () => {
       m.addSource('radius', { type: 'geojson', data: empty });
-      m.addLayer({ id: 'radius-fill', type: 'fill', source: 'radius', paint: { 'fill-color': '#2563eb', 'fill-opacity': 0.07 } });
-      m.addLayer({ id: 'radius-line', type: 'line', source: 'radius', paint: { 'line-color': '#2563eb', 'line-width': 1.5, 'line-dasharray': [3, 2] } });
+      m.addLayer({ id: 'radius-fill', type: 'fill', source: 'radius', paint: { 'fill-color': '#0f62fe', 'fill-opacity': 0.07 } });
+      m.addLayer({ id: 'radius-line', type: 'line', source: 'radius', paint: { 'line-color': '#0f62fe', 'line-width': 1.5, 'line-dasharray': [3, 2] } });
       m.addSource('route', { type: 'geojson', data: empty });
       m.addLayer({
         id: 'route', type: 'line', source: 'route',
-        paint: { 'line-color': '#f59e0b', 'line-width': 5, 'line-opacity': 0.85 },
+        paint: { 'line-color': '#ff832b', 'line-width': 5, 'line-opacity': 0.85 },
         layout: { 'line-join': 'round', 'line-cap': 'round' },
       });
       ready = true;
@@ -175,10 +175,10 @@
 <style>
   .map { width: 100%; height: 100%; min-height: 300px; }
   :global(.mk) {
-    width: 14px; height: 14px; border-radius: 50%; background: #2563eb;
+    width: 14px; height: 14px; border-radius: 50%; background: #0f62fe;
     border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); cursor: pointer;
   }
-  :global(.mk.home) { background: #16a34a; width: 18px; height: 18px; border-radius: 4px; cursor: default; }
-  :global(.mk.selected) { background: #f59e0b; width: 22px; height: 22px; }
-  :global(.mk.dragging) { outline: 3px dashed #f59e0b; outline-offset: 3px; cursor: grab; }
+  :global(.mk.home) { background: #24a148; width: 18px; height: 18px; border-radius: 0; cursor: default; }
+  :global(.mk.selected) { background: #ff832b; width: 22px; height: 22px; }
+  :global(.mk.dragging) { outline: 3px dashed #ff832b; outline-offset: 3px; cursor: grab; }
 </style>

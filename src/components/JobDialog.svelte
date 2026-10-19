@@ -129,8 +129,8 @@
       <label class="field">Wiedervorlage<input type="date" bind:value={job.followUp} /></label>
 
       <div class="field">
-        <span>Relevanz</span>
-        <StarRating bind:value={job.relevance} label="Relevanz" />
+        <span>Relevanz Stelle</span>
+        <StarRating bind:value={job.relevance} label="Relevanz Stelle" />
       </div>
       <label class="field">Stellenlink
         <span class="row">

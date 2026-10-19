@@ -1,24 +1,43 @@
 <script lang="ts">
+  import Close from 'carbon-icons-svelte/lib/Close.svelte';
+  import View from 'carbon-icons-svelte/lib/View.svelte';
+  import Column from 'carbon-icons-svelte/lib/Column.svelte';
+  import FilterRemove from 'carbon-icons-svelte/lib/FilterRemove.svelte';
   import type { LineString } from 'geojson';
-  import { fmtDate, fmtDuration, fmtKm, deadlineClass, daysUntil } from '../lib/format';
+  import { columnByKey, compareRows, type ColumnKey } from '../lib/columns';
+  import { daysUntil, fmtDuration, fmtKm } from '../lib/format';
   import { locationAddress, locationGeoRequest } from '../lib/geo/keys';
   import { getRoute, setManualPosition } from '../lib/geo/services.svelte';
-  import { emptyJob } from '../lib/repo';
+  import { setSetting } from '../lib/repo';
   import { prefs, store, type JobRow } from '../lib/store.svelte';
-  import { STATUSES, statusLabel, type Coord } from '../lib/types';
+  import { STATUSES, type Coord } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
+  import ColumnPicker from './ColumnPicker.svelte';
   import HomeBar from './HomeBar.svelte';
+  import JobCell from './JobCell.svelte';
   import MapView, { type MapPoint } from './MapView.svelte';
 
   // ---------- Filter und Sortierung der kompakten Tabelle ----------
   let q = $state('');
-  let statusFilter = $state<'open' | 'all' | string>('open');
+  let statusFilter = $state<'all' | 'open' | string>('all');
   let deadlineFilter = $state<'all' | 'overdue' | 'week' | 'set'>('all');
-  let sortKey = $state<'title' | 'status' | 'deadline'>('deadline');
+  let sortKey = $state<ColumnKey>('deadline');
   let sortAsc = $state(true);
+  let pickingColumns = $state(false);
 
-  const statusOrder = new Map(STATUSES.map((s, i) => [s.value, i]));
   const closed = new Set(STATUSES.filter(s => s.closed).map(s => s.value));
+  const columns = $derived(store.overviewColumns.map(k => columnByKey.get(k)!));
+  const filtersActive = $derived(!!q.trim() || statusFilter !== 'all' || deadlineFilter !== 'all' || store.radiusKm != null);
+
+  function resetFilters() {
+    q = ''; statusFilter = 'all'; deadlineFilter = 'all';
+    if (store.radiusKm != null) void setSetting('radiusKm', null);
+  }
+
+  function setRadius(value: string) {
+    const n = parseFloat(value.replace(',', '.'));
+    void setSetting('radiusKm', Number.isFinite(n) && n > 0 ? n : null);
+  }
 
   function inRadius(r: JobRow): boolean {
     const radius = store.radiusKm;
@@ -30,7 +49,7 @@
 
   function matches(r: JobRow): boolean {
     const text = q.trim().toLowerCase();
-    if (text && !`${r.job.title} ${r.company?.name ?? ''}`.toLowerCase().includes(text)) return false;
+    if (text && !`${r.job.title} ${r.company?.name ?? ''} ${r.location?.city ?? ''}`.toLowerCase().includes(text)) return false;
     if (statusFilter === 'open' && closed.has(r.job.status)) return false;
     if (statusFilter !== 'open' && statusFilter !== 'all' && r.job.status !== statusFilter) return false;
     const d = daysUntil(r.job.deadline);
@@ -40,24 +59,49 @@
     return true;
   }
 
-  const visible = $derived.by(() => {
-    const rows = store.rows.filter(r => inRadius(r) && matches(r));
-    const dir = sortAsc ? 1 : -1;
-    return rows.sort((a, b) => {
-      if (sortKey === 'title') return dir * a.job.title.localeCompare(b.job.title, 'de');
-      if (sortKey === 'status') return dir * ((statusOrder.get(a.job.status) ?? 0) - (statusOrder.get(b.job.status) ?? 0));
-      // Fristen: ohne Datum immer ans Ende
-      if (!a.job.deadline) return b.job.deadline ? 1 : 0;
-      if (!b.job.deadline) return -1;
-      return dir * a.job.deadline.localeCompare(b.job.deadline);
-    });
-  });
+  const visible = $derived(store.rows.filter(r => inRadius(r) && matches(r)).sort((a, b) => compareRows(a, b, sortKey, sortAsc)));
 
-  function sortBy(k: typeof sortKey) {
+  function sortBy(k: ColumnKey) {
     if (sortKey === k) sortAsc = !sortAsc;
-    else { sortKey = k; sortAsc = true; }
+    else { sortKey = k; sortAsc = !columnByKey.get(k)?.descFirst; }
   }
-  const arrow = (k: typeof sortKey) => (sortKey === k ? (sortAsc ? ' ▲' : ' ▼') : '');
+  const ariaSort = (k: ColumnKey) => (sortKey === k ? (sortAsc ? 'ascending' : 'descending') : 'none');
+
+  // ---------- Breite der Tabellenspalte (an der linken Kartenkante ziehbar) ----------
+  const WIDTH_KEY = 'switchtracker.listWidth';
+  const readWidth = () => { try { return Number(localStorage.getItem(WIDTH_KEY)) || 440; } catch { return 440; } };
+  let listWidth = $state(readWidth());
+  let layoutEl: HTMLDivElement;
+
+  function clampWidth(w: number) {
+    const max = Math.max(320, (layoutEl?.clientWidth ?? window.innerWidth) - 280);
+    return Math.round(Math.min(max, Math.max(320, w)));
+  }
+  function saveWidth() { try { localStorage.setItem(WIDTH_KEY, String(listWidth)); } catch { /* privater Modus */ } }
+
+  function startResize(e: PointerEvent) {
+    e.preventDefault();
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+    const left = layoutEl.getBoundingClientRect().left;
+    const onMove = (ev: PointerEvent) => (listWidth = clampWidth(ev.clientX - left));
+    const onUp = () => {
+      handle.removeEventListener('pointermove', onMove);
+      handle.removeEventListener('pointerup', onUp);
+      saveWidth();
+    };
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onUp);
+  }
+
+  function resizeKey(e: KeyboardEvent) {
+    const step = e.shiftKey ? 80 : 20;
+    if (e.key === 'ArrowLeft') listWidth = clampWidth(listWidth - step);
+    else if (e.key === 'ArrowRight') listWidth = clampWidth(listWidth + step);
+    else return;
+    e.preventDefault();
+    saveWidth();
+  }
 
   // ---------- Karte ----------
   const points = $derived.by(() => {
@@ -77,6 +121,9 @@
   let routeInfo = $state('');
   let routeError = $state('');
   let correcting = $state(false);
+
+  // Abschalten in den Einstellungen beendet eine laufende Korrektur
+  $effect(() => { if (!store.allowPositionCorrection) correcting = false; });
 
   function select(jobId: string) {
     if (ui.selectedJobId !== jobId) { route = null; routeInfo = ''; routeError = ''; correcting = false; }
@@ -115,61 +162,96 @@
   }
 </script>
 
-<div class="overview">
-  <div class="top"><HomeBar /></div>
+<div class="overview" bind:this={layoutEl} style:--list-w="{listWidth}px">
+  <section class="list layer">
+    <div class="controls">
+      <HomeBar />
 
-  <section class="list">
-    <div class="list-head row">
-      <h2 class="grow">Stellen <span class="muted small">{visible.length} von {store.jobs.length}</span></h2>
-      <button onclick={() => (ui.jobDialog = { job: emptyJob(), isNew: true })}>+ Neue Stelle</button>
-    </div>
-    <div class="filters">
-      <input type="search" placeholder="Titel oder Unternehmen" bind:value={q} />
-      <select bind:value={statusFilter} aria-label="Status-Filter">
-        <option value="open">Offene</option>
-        <option value="all">Alle Status</option>
-        {#each STATUSES as s (s.value)}<option value={s.value}>{s.label}</option>{/each}
-      </select>
-      <select bind:value={deadlineFilter} aria-label="Fristen-Filter">
-        <option value="all">Alle Fristen</option>
-        <option value="overdue">Überfällig</option>
-        <option value="week">Nächste 7 Tage</option>
-        <option value="set">Mit Frist</option>
-      </select>
+      <div class="head row">
+        <h2 class="grow">Stellen <span class="muted small">{visible.length} von {store.jobs.length}</span></h2>
+        <button class="ghost icon" title="Alle Filter zurücksetzen" aria-label="Alle Filter zurücksetzen" disabled={!filtersActive} onclick={resetFilters}>
+          <FilterRemove size={20} />
+        </button>
+        <button class="ghost icon" title="Spalten auswählen und sortieren" aria-label="Spalten auswählen und sortieren" onclick={() => (pickingColumns = true)}>
+          <Column size={20} />
+        </button>
+      </div>
+
+      <label class="radius">
+        <span class="lbl">Radius</span>
+        <input
+          type="number" min="1" step="5" placeholder="alle"
+          value={store.radiusKm ?? ''}
+          onchange={e => setRadius(e.currentTarget.value)}
+          title="Luftlinie um die gewählte Heimadresse; leer = kein Radiusfilter"
+        />
+        <span class="muted small">km Luftlinie um die Heimadresse</span>
+      </label>
+
+      <div class="filters">
+        <input type="search" placeholder="Suche in Titel, Unternehmen, Ort" bind:value={q} aria-label="Suche" />
+        <select bind:value={statusFilter} aria-label="Status-Filter">
+          <option value="all">Alle Status</option>
+          <option value="open">Nur offene</option>
+          {#each STATUSES as s (s.value)}<option value={s.value}>{s.label}</option>{/each}
+        </select>
+        <select bind:value={deadlineFilter} aria-label="Fristen-Filter">
+          <option value="all">Alle Fristen</option>
+          <option value="overdue">Überfällig</option>
+          <option value="week">Nächste 7 Tage</option>
+          <option value="set">Mit Frist</option>
+        </select>
+      </div>
     </div>
 
     <div class="table-wrap">
       <table class="data">
         <thead>
           <tr>
-            <th class="sortable" onclick={() => sortBy('title')}>Titel{arrow('title')}</th>
-            <th class="sortable" onclick={() => sortBy('status')}>Status{arrow('status')}</th>
-            <th class="sortable num" onclick={() => sortBy('deadline')}>Frist{arrow('deadline')}</th>
+            {#each columns as c (c.key)}
+              <th class="sortable" class:num={c.num} aria-sort={ariaSort(c.key)} onclick={() => sortBy(c.key)}>
+                {c.label}{sortKey === c.key ? (sortAsc ? ' ▲' : ' ▼') : ''}
+              </th>
+            {/each}
             <th><span class="sr">Details</span></th>
           </tr>
         </thead>
         <tbody>
           {#each visible as r (r.job.id)}
             <tr class:selected={r.job.id === ui.selectedJobId} onclick={() => select(r.job.id)} ondblclick={() => openDetails(r)}>
-              <td>
-                <div class="title">{r.job.title || '(ohne Titel)'}</div>
-                <div class="muted small">
-                  {r.company?.name ?? 'Kein Unternehmen'}{#if r.location} · {r.location.city}{:else if r.job.workModel === 'homeoffice'} · Homeoffice{/if}
-                </div>
+              {#each columns as c (c.key)}
+                <td class:num={c.num}>
+                  <JobCell row={r} col={c.key} subline={c.key === 'title' && !store.overviewColumns.includes('company')} />
+                </td>
+              {/each}
+              <td class="act">
+                <button class="ghost icon sm" title="Details öffnen" aria-label="Details zu {r.job.title}" onclick={e => { e.stopPropagation(); openDetails(r); }}><View size={16} /></button>
               </td>
-              <td><span class="badge s-{r.job.status}">{statusLabel(r.job.status)}</span></td>
-              <td class="num {deadlineClass(r.job.deadline)}">{fmtDate(r.job.deadline)}</td>
-              <td><button class="link small" onclick={e => { e.stopPropagation(); openDetails(r); }}>Details</button></td>
             </tr>
           {:else}
-            <tr><td colspan="4" class="muted empty">
-              {store.jobs.length ? 'Keine Stelle passt zu den Filtern.' : 'Noch keine Stellen. Lege eine neue an oder lade unter Einstellungen die Beispieldaten.'}
+            <tr><td colspan={columns.length + 1} class="muted empty">
+              {store.jobs.length ? 'Keine Stelle passt zu den Filtern.' : 'Noch keine Stellen. Lege im Reiter „Stellen“ eine neue an oder lade in den Einstellungen die Beispieldaten.'}
             </td></tr>
           {/each}
         </tbody>
       </table>
     </div>
   </section>
+
+  <!-- Fokussierbarer Trenner (ARIA „separator“ mit Wert) ist ein bedienbares Element -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+  <div
+    class="splitter"
+    role="separator"
+    aria-orientation="vertical"
+    aria-label="Breite von Tabelle und Karte ändern"
+    aria-valuenow={listWidth}
+    aria-valuemin={320}
+    tabindex="0"
+    title="Ziehen, um die Karte zu vergrößern oder zu verkleinern"
+    onpointerdown={startResize}
+    onkeydown={resizeKey}
+  ></div>
 
   <section class="mapcol">
     <MapView
@@ -184,10 +266,10 @@
     />
 
     {#if selected}
-      <div class="info card">
+      <div class="info">
         <div class="row">
           <strong class="grow">{selected.job.title || '(ohne Titel)'}</strong>
-          <button class="link" aria-label="Auswahl aufheben" onclick={() => { ui.selectedJobId = null; route = null; }}>✕</button>
+          <button class="ghost icon sm" aria-label="Auswahl aufheben" onclick={() => { ui.selectedJobId = null; route = null; }}><Close size={16} /></button>
         </div>
         <div class="muted small">{selected.company?.name ?? 'Kein Unternehmen'}</div>
         {#if selected.location}
@@ -209,48 +291,65 @@
         <div class="row actions">
           {#if selected.coord && store.activeHomeCoord}
             {#if route}
-              <button class="secondary" onclick={() => (route = null)}>Route ausblenden</button>
+              <button class="secondary sm" onclick={() => (route = null)}>Route ausblenden</button>
             {:else}
-              <button class="secondary" disabled={!prefs.orsKey} title={prefs.orsKey ? '' : 'OpenRouteService-Schlüssel unter Einstellungen eintragen'} onclick={showRoute}>Route anzeigen</button>
+              <button class="secondary sm" disabled={!prefs.orsKey} title={prefs.orsKey ? '' : 'OpenRouteService-Schlüssel in den Einstellungen eintragen'} onclick={showRoute}>Route anzeigen</button>
             {/if}
           {/if}
-          {#if selected.coord}
-            <button class="secondary" onclick={() => (correcting = !correcting)}>{correcting ? 'Korrektur abbrechen' : 'Position korrigieren'}</button>
+          {#if selected.coord && store.allowPositionCorrection}
+            <button class="secondary sm" onclick={() => (correcting = !correcting)}>{correcting ? 'Korrektur abbrechen' : 'Position korrigieren'}</button>
           {/if}
-          <button onclick={() => openDetails(selected)}>Details</button>
+          <button class="sm" onclick={() => openDetails(selected)}>Details</button>
         </div>
       </div>
     {/if}
   </section>
 </div>
 
+{#if pickingColumns}
+  <ColumnPicker onclose={() => (pickingColumns = false)} />
+{/if}
+
 <style>
   .overview {
     display: grid;
-    grid-template-columns: minmax(380px, 32%) 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-columns: var(--list-w) 6px 1fr;
     height: 100%;
   }
-  .top { grid-column: 1 / -1; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border); }
-  .list { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-right: 1px solid var(--border); }
-  .list-head { padding: 12px 16px 6px; }
-  .filters { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; padding: 0 16px 10px; }
-  .table-wrap { flex: 1; overflow: auto; }
-  .title { font-weight: 600; }
+  .list { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); }
+  .controls { display: flex; flex-direction: column; gap: 12px; padding: 16px 16px 12px; }
+  .head { margin-top: 4px; gap: 0; }
+  .radius { display: grid; grid-template-columns: auto 96px 1fr; align-items: center; gap: 8px; }
+  .lbl { font-size: 12px; letter-spacing: 0.32px; color: var(--muted); }
+  .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); }
+  .filters input { grid-column: 1 / -1; }
+  .table-wrap { flex: 1; overflow: auto; border-top: 1px solid var(--border); }
+  /* kompakte Tabelle: etwas weniger Innenabstand als die volle Carbon-Tabelle */
+  .table-wrap :global(th), .table-wrap :global(td) { padding-left: 12px; padding-right: 12px; }
+  .table-wrap :global(td.act) { width: 1px; padding: 0 4px; }
   .empty { padding: 24px 16px; text-align: center; cursor: default; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  .mapcol { position: relative; min-height: 0; }
-  .info {
-    position: absolute; left: 12px; bottom: 28px; width: min(380px, calc(100% - 24px));
-    display: flex; flex-direction: column; gap: 4px; padding: 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  .splitter {
+    cursor: col-resize; background: var(--border); position: relative; touch-action: none;
+    outline: 2px solid transparent; outline-offset: -2px;
   }
-  .facts { display: flex; gap: 12px; flex-wrap: wrap; }
-  .actions { margin-top: 6px; }
+  .splitter::after {
+    content: ''; position: absolute; top: 50%; left: 1px; width: 4px; height: 32px; margin-top: -16px;
+    border-left: 1px solid var(--border-strong); border-right: 1px solid var(--border-strong);
+  }
+  .splitter:hover, .splitter:focus-visible { background: var(--accent); }
+  .splitter:focus-visible { outline-color: var(--focus); }
+  .mapcol { position: relative; min-height: 0; min-width: 0; }
+  .info {
+    position: absolute; left: 16px; bottom: 44px; width: min(400px, calc(100% - 32px));
+    display: flex; flex-direction: column; gap: 4px; padding: 16px;
+    background: var(--panel); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  }
+  .facts { display: flex; gap: 16px; flex-wrap: wrap; }
+  .actions { margin-top: 8px; }
   @media (max-width: 800px) {
-    .overview { grid-template-columns: 1fr; grid-template-rows: auto auto 60vh; height: auto; }
-    .list { border-right: 0; }
+    .overview { grid-template-columns: 1fr; grid-template-rows: auto 60vh; height: auto; }
+    .splitter { display: none; }
     .table-wrap { max-height: 50vh; }
-    .filters { grid-template-columns: 1fr 1fr; }
-    .filters input { grid-column: 1 / -1; }
   }
 </style>

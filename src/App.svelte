@@ -9,12 +9,12 @@
   import { geoStatus, requestGeocodes, requestTravel } from './lib/geo/services.svelte';
   import { prefs, store } from './lib/store.svelte';
   import { ui, type Tab } from './lib/ui.svelte';
+  import SettingsIcon from 'carbon-icons-svelte/lib/Settings.svelte';
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Übersicht' },
     { id: 'jobs', label: 'Stellen' },
     { id: 'companies', label: 'Unternehmen' },
-    { id: 'settings', label: 'Einstellungen' },
   ];
 
   // Fehlende Koordinaten automatisch nachschlagen (nur was noch nicht im Cache ist)
@@ -37,21 +37,29 @@
 <div class="shell">
   <header>
     <div class="brand">
-      <img src="{import.meta.env.BASE_URL}icon.svg" alt="" width="24" height="24" />
+      <img src="{import.meta.env.BASE_URL}icon.svg" alt="" width="20" height="20" />
       <span>SwitchTracker</span>
     </div>
-    <nav>
+    <nav aria-label="Bereiche">
       {#each tabs as t (t.id)}
-        <button class="tab" class:active={ui.tab === t.id} onclick={() => (ui.tab = t.id)}>{t.label}</button>
+        <button class="tab" class:active={ui.tab === t.id} aria-current={ui.tab === t.id ? 'page' : undefined} onclick={() => (ui.tab = t.id)}>{t.label}</button>
       {/each}
     </nav>
     <div class="status small">
       {#if geoStatus.geocodePending}<span>Adresssuche: {geoStatus.geocodePending} offen</span>{/if}
       {#if geoStatus.travelPending}<span>Fahrzeiten: {geoStatus.travelPending} offen</span>{/if}
     </div>
+    <button
+      class="gear"
+      class:active={ui.tab === 'settings'}
+      aria-label="Einstellungen"
+      title="Einstellungen"
+      aria-current={ui.tab === 'settings' ? 'page' : undefined}
+      onclick={() => (ui.tab = 'settings')}
+    ><SettingsIcon size={20} /></button>
   </header>
 
-  <div class="guest notice warn">
+  <div class="notice warn guest">
     <strong>Gastmodus:</strong> Deine Daten werden nur in diesem Browser gespeichert. Sichere sie regelmäßig unter
     <button class="link" onclick={() => (ui.tab = 'settings')}>Einstellungen → Backup</button>.
   </div>
@@ -92,24 +100,33 @@
 
 <style>
   .shell { display: flex; flex-direction: column; height: 100%; }
+  /* UI-Shell-Kopfzeile nach Carbon: 48 px, immer dunkel */
   header {
-    display: flex; align-items: center; gap: 16px; padding: 0 16px;
-    background: var(--panel); border-bottom: 1px solid var(--border); flex-wrap: wrap;
+    display: flex; align-items: stretch; height: 48px; flex-shrink: 0;
+    background: var(--shell); color: var(--shell-text); border-bottom: 1px solid #393939;
   }
-  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; padding: 10px 0; }
-  nav { display: flex; gap: 2px; overflow-x: auto; }
+  .brand { display: flex; align-items: center; gap: 8px; padding: 0 16px; font-weight: 600; font-size: 14px; white-space: nowrap; }
+  nav { display: flex; overflow-x: auto; }
   .tab {
-    background: none; color: var(--muted); border: 0; border-bottom: 2px solid transparent;
-    border-radius: 0; padding: 14px 12px 12px;
+    min-height: 0; height: 100%; padding: 0 16px; background: none; color: var(--shell-muted);
+    border: 0; box-shadow: none;
   }
-  .tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
-  .status { margin-left: auto; display: flex; gap: 12px; color: var(--muted); }
-  .guest { border-radius: 0; padding: 6px 16px; }
-  .notice.error { border-radius: 0; padding: 6px 16px; }
+  .tab:hover { background: var(--shell-hover); color: var(--shell-text); }
+  .tab.active { color: var(--shell-text); box-shadow: inset 0 -3px 0 #0f62fe; font-weight: 600; }
+  .status { margin-left: auto; display: flex; align-items: center; gap: 16px; padding: 0 16px; color: var(--shell-muted); white-space: nowrap; }
+  .gear {
+    min-height: 0; height: 48px; width: 48px; padding: 0; justify-content: center;
+    background: none; color: var(--shell-text); border: 0;
+  }
+  .gear:hover { background: var(--shell-hover); }
+  .gear.active { background: #393939; box-shadow: inset 0 -3px 0 #0f62fe; }
+  .guest { flex-shrink: 0; }
+  .notice.error { flex-shrink: 0; }
   main { flex: 1; min-height: 0; overflow: auto; }
   .pad { padding: 16px; }
   @media (max-width: 700px) {
-    header { gap: 0; }
-    .status { margin-left: 0; padding-bottom: 6px; }
+    .brand span { display: none; }
+    .status { display: none; }
+    nav { flex: 1; }
   }
 </style>

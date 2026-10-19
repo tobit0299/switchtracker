@@ -17,8 +17,8 @@ export default defineConfig(({ command, isPreview }) => ({
         short_name: 'SwitchTracker',
         description: 'Bewerbungen, Unternehmen und Standorte mit Karte und Fahrzeiten verwalten',
         lang: 'de',
-        theme_color: '#2563eb',
-        background_color: '#f6f7f9',
+        theme_color: '#161616',
+        background_color: '#f4f4f4',
         display: 'standalone',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
@@ -27,7 +27,7 @@ export default defineConfig(({ command, isPreview }) => ({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,mjs,css,html,svg,png}'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,woff2}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),
