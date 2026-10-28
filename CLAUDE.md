@@ -113,6 +113,9 @@ Umgesetzt, aber noch nicht getestet oder nur teilweise fertig:
 Nur auf ausdrücklichen Auftrag des Nutzers umsetzen, keine eigenständigen Umsetzungsversuche.
 
 - **PDF-Komprimierung und OCR beim Upload** von Dokumenten.
+- **News-Dashboard mit Job-Alert** (notiert am 28.10.2026): eigener Bereich neben der Stellenverfolgung. Auf Knopfdruck sucht eine KI passende Stellen für das eigene Profil.
+  - Gesucht wird anhand einer vom Nutzer gepflegten Vorgabe-Liste (Suchkriterien) und gezielt bei den Unternehmen aus dem Unternehmensverzeichnis.
+  - Vor der Umsetzung zu klären: welcher KI-Dienst (mit Websuche), wessen API-Schlüssel (wie beim ORS-Schlüssel nur lokal, nie im öffentlichen Code), Kosten pro Suche, Format der Vorgabe-Liste und des Profils, Übernahme gefundener Stellen ins Stellenverzeichnis inkl. Dublettenprüfung.
 - Anmeldung und Synchronisation mit Dexie Cloud: geteilter Bereich für das Unternehmensverzeichnis, private Bereiche für Stellen, Fremdregistrierungen verhindern. Dokumente zählen gegen 100 MB im kostenlosen Plan; ggf. nur lokal speichern oder Größe begrenzen.
 - CSV-Import/-Export für Unternehmen und Stellen.
 - Automatisches Datei-Backup über die File System Access API.
