@@ -55,12 +55,32 @@
     onclose();
   }
 
+  let uploadStatus = $state('');
+  let uploading = $state(false);
+  let openText = $state<string | null>(null);
+
   async function upload(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
+    const files = [...(input.files ?? [])];
+    input.value = '';
+    if (!files.length) return;
     if (!saved) await save(false);
     if (!saved) return;
-    for (const f of input.files ?? []) await addDocument(job.id, f);
-    input.value = '';
+    uploading = true;
+    try {
+      // Aufbereitung erst bei Bedarf laden (pdf.js, pdf-lib, Tesseract sind groß)
+      const { processUpload } = await import('../lib/documents');
+      for (const f of files) {
+        uploadStatus = `„${f.name}“ wird verarbeitet …`;
+        const processed = await processUpload(f, { compress: store.docCompress, ocr: store.docOcr }, m => (uploadStatus = m));
+        await addDocument(job.id, processed);
+      }
+      uploadStatus = '';
+    } catch (err) {
+      uploadStatus = 'Hochladen fehlgeschlagen: ' + (err as Error).message;
+    } finally {
+      uploading = false;
+    }
   }
 
   function openDoc(d: JobDocument) {
@@ -144,19 +164,30 @@
       <div class="wide docs">
         <div class="row">
           <h3 class="grow">Dokumente</h3>
-          <label class="secondary upload">
+          <label class="secondary upload" class:disabled={uploading}>
             Datei hinzufügen
-            <input type="file" multiple onchange={upload} />
+            <input type="file" multiple onchange={upload} disabled={uploading} />
           </label>
         </div>
+        {#if uploadStatus}<p class="small" class:err={uploadStatus.startsWith('Hochladen')} role="status">{uploadStatus}</p>{/if}
         {#if documents.length}
           <ul>
             {#each documents as d (d.id)}
-              <li class="row">
-                <button type="button" class="link grow left" onclick={() => openDoc(d)}>{d.name}</button>
-                <span class="muted small">{fmtBytes(d.size)}</span>
-                <button type="button" class="link small" onclick={() => downloadDoc(d)}>Herunterladen</button>
-                <button type="button" class="link small err" onclick={() => removeDoc(d)}>Löschen</button>
+              <li>
+                <div class="row">
+                  <button type="button" class="link grow left" onclick={() => openDoc(d)}>{d.name}</button>
+                  <span class="muted small" title={d.compressed && d.originalSize ? `Original: ${fmtBytes(d.originalSize)}` : ''}>
+                    {fmtBytes(d.size)}{#if d.compressed && d.originalSize} (−{Math.round((1 - d.size / d.originalSize) * 100)} %){/if}
+                  </span>
+                  {#if d.text}
+                    <button type="button" class="link small" onclick={() => (openText = openText === d.id ? null : d.id)}>
+                      {openText === d.id ? 'Text ausblenden' : d.ocr ? 'Erkannter Text' : 'Text'}
+                    </button>
+                  {/if}
+                  <button type="button" class="link small" onclick={() => downloadDoc(d)}>Herunterladen</button>
+                  <button type="button" class="link small err" onclick={() => removeDoc(d)}>Löschen</button>
+                </div>
+                {#if openText === d.id}<pre class="doctext">{d.text}</pre>{/if}
               </li>
             {/each}
           </ul>
@@ -188,6 +219,11 @@
     border-radius: 6px; background: var(--panel); cursor: pointer; font-size: 14px;
   }
   .upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload.disabled { opacity: 0.5; pointer-events: none; }
+  .doctext {
+    margin: 4px 0 8px; padding: 12px; max-height: 240px; overflow: auto; white-space: pre-wrap;
+    font: 12px/1.5 'IBM Plex Mono', ui-monospace, Consolas, monospace; background: var(--panel-2);
+  }
   footer { border-top: 1px solid var(--border); padding-top: 12px; }
   @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
 </style>

@@ -25,7 +25,7 @@
 
   function matches(r: JobRow): boolean {
     const text = q.trim().toLowerCase();
-    if (text && !`${r.job.title} ${r.company?.name ?? ''} ${r.location?.city ?? ''} ${r.job.notes}`.toLowerCase().includes(text)) return false;
+    if (text && !`${r.job.title} ${r.company?.name ?? ''} ${r.location?.city ?? ''} ${r.job.notes} ${store.docTextByJob.get(r.job.id) ?? ''}`.toLowerCase().includes(text)) return false;
     if (status === 'open' && closed.has(r.job.status)) return false;
     if (status !== 'open' && status !== 'all' && r.job.status !== status) return false;
     if (workModel && r.job.workModel !== workModel) return false;
@@ -65,7 +65,7 @@
   </div>
 
   <div class="filters card">
-    <input type="search" class="search" placeholder="Suche in Titel, Unternehmen, Ort, Notizen" bind:value={q} />
+    <input type="search" class="search" placeholder="Suche in Titel, Unternehmen, Ort, Notizen und Dokumenten" bind:value={q} />
     <label class="field">Status
       <select bind:value={status}>
         <option value="open">Offene</option>

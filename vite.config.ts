@@ -5,8 +5,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 // GitHub Pages liefert das Projekt unter /switchtracker/ aus, lokal unter /
 export default defineConfig(({ command, isPreview }) => ({
   base: command === 'build' || isPreview ? '/switchtracker/' : '/',
-  // MapLibre allein ist ~1 MB groß; das ist für eine Karten-App erwartbar
-  build: { chunkSizeWarningLimit: 1500 },
+  // MapLibre (~1 MB) und Dexie Cloud machen das Hauptpaket groß; für diese App erwartbar
+  build: { chunkSizeWarningLimit: 1800 },
   plugins: [
     svelte(),
     VitePWA({

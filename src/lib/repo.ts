@@ -1,4 +1,6 @@
+import { directoryRealmId } from './cloud.svelte';
 import { db, newId } from './db';
+import type { ProcessedFile } from './documents';
 import type { Company, Home, Job, JobDocument, Location } from './types';
 
 /**
@@ -18,12 +20,19 @@ export function emptyLocation(companyId: string): Location {
   return { id: newId(), companyId, label: '', street: '', zip: '', city: '', state: '', country: 'DE', createdAt: now(), updatedAt: now() };
 }
 
+/** Neue Einträge des Unternehmensverzeichnisses landen im gemeinsamen Realm, sofern es einen gibt. */
+function withRealm<T extends { realmId?: string }>(obj: T, fallback?: string): T {
+  const realmId = obj.realmId ?? fallback ?? directoryRealmId();
+  return realmId ? { ...obj, realmId } : obj;
+}
+
 export async function saveCompany(c: Company) {
-  await db.companies.put({ ...c, updatedAt: now() });
+  await db.companies.put(withRealm({ ...c, updatedAt: now() }));
 }
 
 export async function saveLocation(l: Location) {
-  await db.locations.put({ ...l, updatedAt: now() });
+  const company = await db.companies.get(l.companyId);
+  await db.locations.put(withRealm({ ...l, updatedAt: now() }, company?.realmId));
 }
 
 /** Löscht den Standort und löst die Verknüpfung betroffener Stellen. */
@@ -64,8 +73,11 @@ export async function deleteJob(id: string) {
   });
 }
 
-export async function addDocument(jobId: string, file: File) {
-  const doc: JobDocument = { id: newId(), jobId, name: file.name, type: file.type, size: file.size, blob: file, createdAt: now() };
+export async function addDocument(jobId: string, f: ProcessedFile) {
+  const doc: JobDocument = {
+    id: newId(), jobId, name: f.name, type: f.type, size: f.blob.size, blob: f.blob, createdAt: now(),
+    originalSize: f.originalSize, compressed: f.compressed, text: f.text, ocr: f.ocr,
+  };
   await db.documents.add(doc);
 }
 

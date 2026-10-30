@@ -29,6 +29,11 @@ class Store {
   /** Suchradius in km, null = kein Radiusfilter */
   radiusKm = $derived((this.settings.radiusKm as number | null | undefined) ?? null);
   profile = $derived((this.settings.profile as Profile | undefined) ?? { name: '', email: '' });
+  /** Dokument-Aufbereitung beim Upload, beides standardmäßig an */
+  docCompress = $derived(this.settings.docCompress !== false);
+  docOcr = $derived(this.settings.docOcr !== false);
+  /** Text aller Dokumente je Stelle, für die Volltextsuche */
+  docTextByJob = $state.raw<Map<string, string>>(new Map());
   /** „Position korrigieren“ (Marker ziehen) ist standardmäßig aus */
   allowPositionCorrection = $derived(this.settings.allowPositionCorrection === true);
   /** sichtbare Spalten der kompakten Tabelle in der Übersicht, in Anzeigereihenfolge */
@@ -113,6 +118,12 @@ export function startStore() {
   bind(() => db.settings.toArray(), once(v => (store.settings = Object.fromEntries(v.map(s => [s.key, s.value])))));
   bind(() => geoDb.geocodes.toArray(), once(v => (store.geocodes = v)));
   bind(() => geoDb.travel.toArray(), once(v => (store.travel = v)));
+  // nur Name und Text, die Dateiinhalte (Blobs) werden dafür nicht gebraucht
+  liveQuery(async () => {
+    const map = new Map<string, string>();
+    await db.documents.each(d => map.set(d.jobId, `${map.get(d.jobId) ?? ''} ${d.name} ${d.text ?? ''}`));
+    return map;
+  }).subscribe({ next: v => (store.docTextByJob = v), error: e => console.error('liveQuery', e) });
 }
 
 // ---------- Nur lokal gespeicherte Werte (nicht im Backup, nie synchronisiert) ----------

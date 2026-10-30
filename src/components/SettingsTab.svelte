@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import AccountSection from './AccountSection.svelte';
   import { createBackup, deleteAllData, downloadJson, parseBackup, restoreBackup, type Backup } from '../lib/backup';
   import { addressKey, homeGeoRequest } from '../lib/geo/keys';
   import { clearGeoCache, regeocode } from '../lib/geo/services.svelte';
@@ -108,9 +109,11 @@
     <p class="small">{#if prefs.orsKey}<span class="ok">Schlüssel hinterlegt.</span>{:else}<span class="muted">Kein Schlüssel hinterlegt.</span>{/if}</p>
   </section>
 
+  <AccountSection />
+
   <section class="card">
     <h2>Profil</h2>
-    <p class="muted small">Die Anmeldung mit eigenem Konto folgt später. Bis dahin läuft die App im Gastmodus.</p>
+    <p class="muted small">Angaben zu dir; sie werden nur auf diesem Gerät gespeichert.</p>
     <form class="grid" onsubmit={saveProfile}>
       <label class="field">Name<input bind:value={profile.name} /></label>
       <label class="field">E-Mail<input type="email" bind:value={profile.email} /></label>
@@ -162,6 +165,27 @@
         </li>
       {/if}
     </ul>
+  </section>
+
+  <section class="card">
+    <h2>Dokumente</h2>
+    <label class="row check">
+      <input type="checkbox" checked={store.docCompress} onchange={e => setSetting('docCompress', e.currentTarget.checked)} />
+      Beim Hochladen komprimieren
+    </label>
+    <p class="muted small">
+      PDFs mit Text werden verlustfrei neu gespeichert, gescannte PDFs und Fotos als JPEG mit 150 dpi.
+      Die kleinere Datei wird nur übernommen, wenn sie mindestens 10 % spart.
+    </p>
+    <label class="row check">
+      <input type="checkbox" checked={store.docOcr} onchange={e => setSetting('docOcr', e.currentTarget.checked)} />
+      Texterkennung (OCR) für gescannte PDFs und Fotos
+    </label>
+    <p class="muted small">
+      Der erkannte Text wird beim Dokument gespeichert und ist im Reiter „Stellen“ durchsuchbar. Die Erkennung läuft
+      im Browser; beim ersten Mal werden die Sprachdaten (Deutsch, Englisch) einmalig geladen, die Dokumente selbst
+      verlassen das Gerät nicht.
+    </p>
   </section>
 
   <section class="card">

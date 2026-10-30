@@ -4,8 +4,10 @@ import '@fontsource/ibm-plex-sans/latin-600.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './app.css';
 import App from './App.svelte';
+import { startCloud } from './lib/cloud.svelte';
 import { startStore } from './lib/store.svelte';
 
+startCloud();
 startStore();
 
 // Browser bitten, die lokalen Daten nicht bei Speicherknappheit zu löschen

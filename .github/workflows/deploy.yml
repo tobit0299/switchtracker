@@ -26,6 +26,9 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run build
+        env:
+          # Repository-Variable (Settings → Secrets and variables → Actions → Variables); leer = nur Gastmodus
+          VITE_DEXIE_CLOUD_URL: ${{ vars.DEXIE_CLOUD_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

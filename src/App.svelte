@@ -10,12 +10,18 @@
   import { prefs, store } from './lib/store.svelte';
   import { ui, type Tab } from './lib/ui.svelte';
   import SettingsIcon from 'carbon-icons-svelte/lib/Settings.svelte';
+  import UserAvatar from 'carbon-icons-svelte/lib/UserAvatar.svelte';
+  import { cloud, login } from './lib/cloud.svelte';
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Übersicht' },
     { id: 'jobs', label: 'Stellen' },
     { id: 'companies', label: 'Unternehmen' },
   ];
+
+  // Hinweis, falls der erste Start (Dexie Cloud wartet auf den ersten Abgleich) hängt
+  let slowLoad = $state(false);
+  setTimeout(() => (slowLoad = true), 8000);
 
   // Fehlende Koordinaten automatisch nachschlagen (nur was noch nicht im Cache ist)
   $effect(() => {
@@ -48,6 +54,11 @@
     <div class="status small">
       {#if geoStatus.geocodePending}<span>Adresssuche: {geoStatus.geocodePending} offen</span>{/if}
       {#if geoStatus.travelPending}<span>Fahrzeiten: {geoStatus.travelPending} offen</span>{/if}
+      {#if cloud.loggedIn}
+        <span class="user" title="Angemeldet als {cloud.email} · {cloud.syncPhase === 'in-sync' ? 'synchronisiert' : 'synchronisiere …'}">
+          <UserAvatar size={16} /> {cloud.email}{cloud.syncPhase === 'in-sync' ? '' : ' · …'}
+        </span>
+      {/if}
     </div>
     <button
       class="gear"
@@ -59,10 +70,15 @@
     ><SettingsIcon size={20} /></button>
   </header>
 
-  <div class="notice warn guest">
-    <strong>Gastmodus:</strong> Deine Daten werden nur in diesem Browser gespeichert. Sichere sie regelmäßig unter
-    <button class="link" onclick={() => (ui.tab = 'settings')}>Einstellungen → Backup</button>.
-  </div>
+  {#if !cloud.loggedIn}
+    <div class="notice warn guest">
+      <strong>Gastmodus:</strong> Deine Daten werden nur in diesem Browser gespeichert. Sichere sie regelmäßig unter
+      <button class="link" onclick={() => (ui.tab = 'settings')}>Einstellungen → Backup</button>{#if cloud.enabled}{' '}oder
+        <button class="link" onclick={() => login()}>melde dich an</button>, um sie zu synchronisieren{/if}.
+    </div>
+  {:else if cloud.syncError}
+    <div class="notice error guest">Synchronisation fehlgeschlagen: {cloud.syncError}</div>
+  {/if}
 
   {#if geoStatus.error}
     <div class="notice error row">
@@ -74,6 +90,12 @@
   <main>
     {#if !store.loaded}
       <p class="muted pad">Daten werden geladen …</p>
+      {#if slowLoad && cloud.enabled}
+        <p class="notice warn slow">
+          Der erste Start verbindet sich einmalig mit dem Synchronisationsserver und braucht dafür Internet.
+          {#if cloud.syncError}Fehler: {cloud.syncError}. {/if}Bitte die Verbindung prüfen; die App lädt weiter, sobald der Server erreichbar ist.
+        </p>
+      {/if}
     {:else if ui.tab === 'overview'}
       <Overview />
     {:else if ui.tab === 'jobs'}
@@ -121,9 +143,11 @@
   .gear:hover { background: var(--shell-hover); }
   .gear.active { background: #393939; box-shadow: inset 0 -3px 0 #0f62fe; }
   .guest { flex-shrink: 0; }
+  .user { display: inline-flex; align-items: center; gap: 6px; }
   .notice.error { flex-shrink: 0; }
   main { flex: 1; min-height: 0; overflow: auto; }
   .pad { padding: 16px; }
+  .slow { margin: 0 16px; max-width: 720px; }
   @media (max-width: 700px) {
     .brand span { display: none; }
     .status { display: none; }

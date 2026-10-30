@@ -10,3 +10,7 @@ Thumbs.db
 .idea/
 .claude/settings.local.json
 npm-debug.log*
+
+# Dexie Cloud CLI: enthält Zugangsdaten, nie einchecken
+dexie-cloud.key
+dexie-cloud.json

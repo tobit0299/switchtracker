@@ -12,6 +12,8 @@ export interface Company {
   notes: string;
   createdAt: number;
   updatedAt: number;
+  /** Dexie Cloud: Realm (privat oder gemeinsames Unternehmensverzeichnis) */
+  realmId?: string;
 }
 
 export interface Location {
@@ -28,6 +30,8 @@ export interface Location {
   country: string;
   createdAt: number;
   updatedAt: number;
+  /** Dexie Cloud: immer derselbe Realm wie das Unternehmen */
+  realmId?: string;
 }
 
 // ---------- Stellenverzeichnis (pro Nutzer) ----------
@@ -69,6 +73,12 @@ export interface JobDocument {
   size: number;
   blob: Blob;
   createdAt: number;
+  /** Größe vor der Komprimierung (fehlt bei älteren Dokumenten) */
+  originalSize?: number;
+  compressed?: boolean;
+  /** ausgelesener oder per OCR erkannter Text, für Suche und Anzeige */
+  text?: string;
+  ocr?: boolean;
 }
 
 export interface Home {
