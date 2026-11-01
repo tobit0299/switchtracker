@@ -7,6 +7,7 @@
   import { COUNTRIES, STATUSES, WORK_MODELS } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
   import JobCell from './JobCell.svelte';
+  import SourceTag from './SourceTag.svelte';
 
   // ---------- Filter ----------
   let q = $state('');
@@ -60,7 +61,8 @@
 
 <div class="page">
   <div class="row head">
-    <h2 class="grow">Stellen <span class="muted small">{visible.length} von {store.jobs.length}</span></h2>
+    <h2>Stellen <span class="muted small">{visible.length} von {store.jobs.length}</span></h2>
+    <span class="grow"><SourceTag of="jobs" /></span>
     <button onclick={() => (ui.jobDialog = { job: emptyJob(), isNew: true })}><Add size={16} /> Neue Stelle</button>
   </div>
 

@@ -93,3 +93,35 @@ export async function acceptInvite(invite: Invite) {
   await invite.accept();
   if (invite.realm?.name === DIRECTORY_REALM_NAME) await moveDirectoryInto(invite.realmId);
 }
+
+// ---------- Herkunft der angezeigten Daten (für Hinweise in der Oberfläche) ----------
+
+/** Wem die angezeigten Stellen gehören: angemeldetes Profil oder Gastmodus auf diesem Gerät. */
+export function profileSource(): { kind: 'guest' | 'profile'; label: string; detail: string } {
+  if (!cloud.loggedIn) return { kind: 'guest', label: 'Gastmodus', detail: 'Stellen liegen nur in diesem Browser.' };
+  return { kind: 'profile', label: `Profil ${cloud.email}`, detail: 'Deine Stellen sind privat und nur in deinem Konto sichtbar.' };
+}
+
+/** Andere Mitglieder des gemeinsamen Verzeichnisses (Name oder E-Mail), ohne einen selbst */
+function otherMembers(): string[] {
+  return cloud.directoryMembers
+    .filter(m => m.email?.toLowerCase() !== cloud.email.toLowerCase() && m.userId !== cloud.userId && !m.rejected)
+    .map(m => m.name || m.email || m.userId || '?');
+}
+
+/** Ob das Unternehmensverzeichnis eigen oder geteilt ist. */
+export function directorySource(): { kind: 'guest' | 'own' | 'shared'; label: string; detail: string } {
+  if (!cloud.loggedIn) return { kind: 'guest', label: 'Eigenes Verzeichnis (Gastmodus)', detail: 'Unternehmen liegen nur in diesem Browser.' };
+  if (!cloud.directoryRealm) return { kind: 'own', label: 'Eigenes Verzeichnis', detail: 'Nur für dich sichtbar. Teilen lässt es sich in den Einstellungen.' };
+  const others = otherMembers();
+  return {
+    kind: 'shared',
+    label: others.length ? `Gemeinsames Verzeichnis mit ${others.join(', ')}` : 'Gemeinsames Verzeichnis',
+    detail: 'Alle Mitglieder sehen und bearbeiten diese Unternehmen und Standorte.',
+  };
+}
+
+/** Liegt das Unternehmen im gemeinsamen Verzeichnis? (false im Gastmodus oder ohne geteiltes Verzeichnis) */
+export function isSharedCompany(c: { realmId?: string } | null | undefined): boolean {
+  return !!c && cloud.loggedIn && !!cloud.directoryRealm && c.realmId === cloud.directoryRealm.realmId;
+}

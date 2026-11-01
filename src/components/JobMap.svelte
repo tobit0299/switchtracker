@@ -18,6 +18,7 @@
   import MapLayout from './MapLayout.svelte';
   import MapView, { type MapPoint } from './MapView.svelte';
   import RadiusField from './RadiusField.svelte';
+  import SourceTag from './SourceTag.svelte';
 
   // ---------- Filter und Sortierung der kompakten Tabelle ----------
   let q = $state('');
@@ -143,6 +144,7 @@
           <Column size={20} />
         </button>
       </div>
+      <div class="srcline"><SourceTag of="jobs" /></div>
 
       <RadiusField />
 
@@ -253,6 +255,10 @@
     {/if}
   {/snippet}
 </MapLayout>
+
+<style>
+  .srcline { margin-top: -8px; }
+</style>
 
 {#if pickingColumns}
   <ColumnPicker

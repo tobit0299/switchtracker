@@ -6,6 +6,7 @@
   import { store } from '../lib/store.svelte';
   import { COUNTRIES, type Company, type Location } from '../lib/types';
   import StarRating from './StarRating.svelte';
+  import { cloud, isSharedCompany } from '../lib/cloud.svelte';
 
   let { companyId, onclose }: { companyId: string; onclose: () => void } = $props();
 
@@ -83,6 +84,11 @@
   <form class="body" onsubmit={save}>
     <header class="row">
       <h2 id="company-dialog-title" class="grow">{isNew ? 'Neues Unternehmen' : company.name}</h2>
+      {#if cloud.loggedIn}
+        <span class="badge" class:shared={isSharedCompany(company) || (isNew && !!cloud.directoryRealm)} title="Wo dieses Unternehmen gespeichert ist">
+          {isSharedCompany(company) || (isNew && !!cloud.directoryRealm) ? 'Gemeinsames Verzeichnis' : 'Nur für dich'}
+        </span>
+      {/if}
       <button type="button" class="link" aria-label="Schließen" onclick={() => dialog.close()}>✕</button>
     </header>
 
@@ -160,4 +166,5 @@
     .grid, .locgrid { grid-template-columns: 1fr; }
     .span2 { grid-column: auto; }
   }
+  .badge.shared { background: #ffd9be; color: #5e2900; }
 </style>

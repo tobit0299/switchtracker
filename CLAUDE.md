@@ -78,7 +78,8 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
 2. **Unternehmenskarte:** gleiches Layout, eine Zeile je Standort des Unternehmensverzeichnisses, Marker **orange**. Filter: Suche, Branche, Bewertung ab, „mit/ohne eigene Stellen“, Radius. Eigene Spaltenauswahl (`companyMapColumns`, Standard: Unternehmen, Ort, Bewertung). Infokasten mit Luftlinie, Fahrzeit, Anzahl eigener Stellen, Route und „Unternehmen öffnen“.
 3. **Datenbank** mit Unterreitern:
    - **Stellen:** vollständige Tabelle mit allen Feldern („Kennziffer“, „Relevanz Stelle“, „Bewertung Unternehmen“), Filter, „Neue Stelle“. Auswahl „Luftlinie und Fahrzeit ab“ (setzt die aktive Heimadresse); die Spaltenköpfe nennen die Bezugsadresse.
-   - **Unternehmen:** vollständige Tabelle mit Unternehmen und Standorten.
+   - **Unternehmen:** vollständige Tabelle mit Unternehmen und Standorten; mit gemeinsamem Verzeichnis zusätzlich Spalte „Verzeichnis“ (Gemeinsam / Nur ich).
+- **Herkunfts-Plakette** (`SourceTag`, Logik in `cloud.svelte.ts`) unter den Überschriften: bei Stellen „Gastmodus“ bzw. „Profil <E-Mail>“, bei Unternehmen „Eigenes Verzeichnis (Gastmodus)“, „Eigenes Verzeichnis“ oder „Gemeinsames Verzeichnis mit <Mitglieder>“ (orange). In der Unternehmenskarte zeigt ein Personen-Symbol geteilte Unternehmen, im Unternehmensdialog eine Plakette den Speicherort.
 4. **Einstellungen:** kein Reiter, sondern Zahnrad oben rechts. ORS-Schlüssel, Konto und Synchronisation, Profil, Heimadressen, Dokumente (Komprimierung/OCR), Karte („Position korrigieren“ an/aus, Standard aus), Backup. Ganz unten die Versionsanzeige: Version aus `package.json`, Commit (lokal per `git`, im Deployment aus `GITHUB_SHA`) und Build-Zeitpunkt, eingesetzt über `define` in `vite.config.ts`.
 - Fahrzeiten werden für alle Standorte des Verzeichnisses berechnet (nicht nur für solche mit Stellen), weil die Unternehmenskarte sie anzeigt.
 

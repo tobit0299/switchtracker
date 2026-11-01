@@ -2,6 +2,11 @@
   import { store } from '../lib/store.svelte';
   import { ui } from '../lib/ui.svelte';
   import StarRating from './StarRating.svelte';
+  import SourceTag from './SourceTag.svelte';
+  import { cloud, isSharedCompany } from '../lib/cloud.svelte';
+
+  /** Spalte „Verzeichnis“ nur, wenn es überhaupt ein gemeinsames Verzeichnis gibt */
+  const showRealm = $derived(cloud.loggedIn && !!cloud.directoryRealm);
 
   let q = $state('');
   let sortKey = $state<'name' | 'industry' | 'rating' | 'locations' | 'jobs'>('name');
@@ -42,7 +47,8 @@
 
 <div class="page">
   <div class="row head">
-    <h2 class="grow">Unternehmen <span class="muted small">{rows.length} von {store.companies.length}</span></h2>
+    <h2>Unternehmen <span class="muted small">{rows.length} von {store.companies.length}</span></h2>
+    <span class="grow"><SourceTag of="companies" /></span>
     <input type="search" placeholder="Suche in Name, Branche, Orten" bind:value={q} />
     <button onclick={() => (ui.companyDialog = 'new')}>+ Neues Unternehmen</button>
   </div>
@@ -58,6 +64,7 @@
           <th class="sortable num" onclick={() => sortBy('locations')}>Standorte{arrow('locations')}</th>
           <th class="sortable num" onclick={() => sortBy('jobs')}>Stellen{arrow('jobs')}</th>
           <th>Website</th>
+          {#if showRealm}<th>Verzeichnis</th>{/if}
         </tr>
       </thead>
       <tbody>
@@ -70,9 +77,12 @@
             <td class="num">{r.locations}</td>
             <td class="num">{r.jobs}</td>
             <td>{#if r.c.website}<a href={r.c.website} target="_blank" rel="noopener noreferrer" onclick={e => e.stopPropagation()}>{r.c.website.replace(/^https?:\/\//, '')}</a>{/if}</td>
+            {#if showRealm}
+              <td>{#if isSharedCompany(r.c)}<span class="badge shared">Gemeinsam</span>{:else}<span class="badge">Nur ich</span>{/if}</td>
+            {/if}
           </tr>
         {:else}
-          <tr><td colspan="7" class="muted empty">Noch keine Unternehmen.</td></tr>
+          <tr><td colspan={showRealm ? 8 : 7} class="muted empty">Noch keine Unternehmen.</td></tr>
         {/each}
       </tbody>
     </table>
@@ -84,4 +94,5 @@
   .table-wrap { padding: 0; overflow: auto; }
   .name { font-weight: 600; }
   .empty { padding: 24px; text-align: center; cursor: default; }
+  .badge.shared { background: #ffd9be; color: #5e2900; }
 </style>

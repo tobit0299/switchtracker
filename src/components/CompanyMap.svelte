@@ -18,6 +18,7 @@
   import MapLayout from './MapLayout.svelte';
   import MapView, { type MapPoint } from './MapView.svelte';
   import RadiusField from './RadiusField.svelte';
+  import SourceTag from './SourceTag.svelte';
   import StarRating from './StarRating.svelte';
 
   // ---------- Filter und Sortierung ----------
@@ -120,6 +121,7 @@
           <Column size={20} />
         </button>
       </div>
+      <div class="srcline"><SourceTag of="companies" /></div>
 
       <RadiusField />
 
@@ -246,4 +248,5 @@
 <style>
   .pin.company:not(.nopin) { --pin: #ff832b; color: #161616; }
   .wide { grid-column: 1 / -1; }
+  .srcline { margin-top: -8px; }
 </style>
