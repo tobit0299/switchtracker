@@ -9,6 +9,11 @@
   import { prefs, store } from '../lib/store.svelte';
   import type { Home } from '../lib/types';
 
+  // ---------- Version (beim Build eingesetzt) ----------
+  const appVersion = __APP_VERSION__;
+  const appCommit = __APP_COMMIT__;
+  const buildDate = new Date(__APP_BUILD_DATE__).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
+
   // ---------- ORS-Schlüssel ----------
   let keyInput = $state(prefs.orsKey);
   let showKey = $state(false);
@@ -247,11 +252,18 @@
       <button class="danger" onclick={wipe}>Alle Daten löschen</button>
     </div>
   </section>
+
+  <footer class="version small muted">
+    SwitchTracker {appVersion}
+    {#if appCommit} · Build <a href="https://github.com/tobit0299/switchtracker/commit/{appCommit}" target="_blank" rel="noopener noreferrer">{appCommit}</a>{/if}
+    · {buildDate}
+  </footer>
 </div>
 
 <style>
   .page { padding: 16px; display: flex; flex-direction: column; gap: 16px; max-width: 900px; }
   h1 { font-size: 28px; font-weight: 400; margin: 8px 0; }
+  .version { padding: 0 0 16px; }
   .check { gap: 12px; cursor: pointer; }
   section { display: flex; flex-direction: column; gap: 10px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }

@@ -11,6 +11,8 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
 
 ## Befehle
 
+- Versionsnummer in `package.json` bei neuen Funktionen erhöhen (aktuell 0.2.0); sie wird in den Einstellungen angezeigt.
+
 - `npm run dev`: Entwicklungsserver (Basis `/`)
 - `npm run check`: svelte-check und TypeScript, muss fehlerfrei sein
 - `npm run build` / `npm run preview`: Produktionsbuild bzw. Vorschau unter `/switchtracker/`
@@ -72,7 +74,7 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
    - „Details“ (Augen-Symbol): vollständige Stelleninformationen, Notizfeld und Dokumentenablage.
 2. **Stellen:** vollständige Tabelle mit allen Feldern („Relevanz Stelle“, „Bewertung Unternehmen“), Filter, „Neue Stelle“.
 3. **Unternehmen:** vollständige Tabelle mit Unternehmen und Standorten.
-4. **Einstellungen:** kein Reiter, sondern Zahnrad oben rechts. ORS-Schlüssel, Profil, Heimadressen, Karte („Position korrigieren“ an/aus, Standard aus), Backup.
+4. **Einstellungen:** kein Reiter, sondern Zahnrad oben rechts. ORS-Schlüssel, Konto und Synchronisation, Profil, Heimadressen, Dokumente (Komprimierung/OCR), Karte („Position korrigieren“ an/aus, Standard aus), Backup. Ganz unten die Versionsanzeige: Version aus `package.json`, Commit (lokal per `git`, im Deployment aus `GITHUB_SHA`) und Build-Zeitpunkt, eingesetzt über `define` in `vite.config.ts`.
 
 ## Technische Richtung
 
