@@ -2,11 +2,12 @@
   import { onMount } from 'svelte';
   import { addressKey, locationAddress, locationGeoRequest } from '../lib/geo/keys';
   import { regeocode } from '../lib/geo/services.svelte';
-  import { deleteCompany, deleteLocation, emptyCompany, emptyLocation, saveCompany, saveLocation } from '../lib/repo';
-  import { store } from '../lib/store.svelte';
+  import { copyCompany, deleteCompany, deleteLocation, emptyCompany, emptyLocation, moveCompany, saveCompany, saveLocation } from '../lib/repo';
+  import { prefs, store } from '../lib/store.svelte';
   import { COUNTRIES, type Company, type Location } from '../lib/types';
   import StarRating from './StarRating.svelte';
-  import { cloud, isSharedCompany } from '../lib/cloud.svelte';
+  import { DIRECTORY_LABEL, cloud, directoryOf, hasSharedDirectory, realmIdOf, type Directory } from '../lib/cloud.svelte';
+  import { ui } from '../lib/ui.svelte';
 
   let { companyId, onclose }: { companyId: string; onclose: () => void } = $props();
 
@@ -18,6 +19,9 @@
   let company = $state<Company>(original ? { ...original } : emptyCompany());
   let locations = $state<Location[]>(original ? store.locations.filter(l => l.companyId === original.id).map(l => ({ ...l })) : []);
   const removedLocationIds: string[] = [];
+  // svelte-ignore state_referenced_locally
+  let directory = $state<Directory>(isNew ? (hasSharedDirectory() ? prefs.newCompanyDirectory : 'private') : directoryOf(original));
+  const otherDirectory = $derived<Directory>(directory === 'shared' ? 'private' : 'shared');
   let dialog: HTMLDialogElement;
   let error = $state('');
 
@@ -63,12 +67,31 @@
   async function save(e: SubmitEvent) {
     e.preventDefault();
     if (!company.name.trim()) { error = 'Bitte einen Namen eingeben.'; return; }
-    await saveCompany($state.snapshot(company));
+    const realmId = realmIdOf(directory);
+    const moved = !isNew && directory !== directoryOf(original);
+    if (moved && directory === 'private' && !confirm(`„${company.name}“ ins private Verzeichnis verschieben?
+Die anderen Mitglieder sehen es danach nicht mehr; ihre Stellen verlieren die Verknüpfung.`)) return;
+    if (isNew && hasSharedDirectory()) prefs.setNewCompanyDirectory(directory);
+    const snap = $state.snapshot(company);
+    if (realmId) snap.realmId = realmId;
+    await saveCompany(snap);
     for (const id of removedLocationIds) await deleteLocation(id);
     for (const l of $state.snapshot(locations)) {
       if (l.street || l.city || l.zip) await saveLocation({ ...l, companyId: company.id });
     }
+    if (moved && realmId) await moveCompany(company.id, realmId);
     onclose();
+  }
+
+  /** Unabhängige Kopie im jeweils anderen Verzeichnis; der Dialog wechselt danach zur Kopie. */
+  async function copyToOther() {
+    const target = otherDirectory;
+    if (!confirm(`Kopie von „${company.name}“ samt Standorten im Verzeichnis „${DIRECTORY_LABEL[target]}“ anlegen?
+Ungespeicherte Änderungen hier gehen verloren; Kopie und Original sind danach unabhängig.`)) return;
+    const id = await copyCompany(company.id, realmIdOf(target));
+    // warten, bis die liveQuery die Kopie geliefert hat, sonst öffnet der Dialog leer
+    for (let i = 0; i < 40 && !store.companyById.has(id); i++) await new Promise(r => setTimeout(r, 50));
+    ui.companyDialog = id;
   }
 
   async function remove() {
@@ -84,16 +107,27 @@
   <form class="body" onsubmit={save}>
     <header class="row">
       <h2 id="company-dialog-title" class="grow">{isNew ? 'Neues Unternehmen' : company.name}</h2>
-      {#if cloud.loggedIn}
-        <span class="badge" class:shared={isSharedCompany(company) || (isNew && !!cloud.directoryRealm)} title="Wo dieses Unternehmen gespeichert ist">
-          {isSharedCompany(company) || (isNew && !!cloud.directoryRealm) ? 'Gemeinsames Verzeichnis' : 'Nur für dich'}
-        </span>
+      {#if cloud.loggedIn && !hasSharedDirectory()}
+        <span class="badge" title="Wo dieses Unternehmen gespeichert ist">Privates Verzeichnis</span>
       {/if}
       <button type="button" class="link" aria-label="Schließen" onclick={() => dialog.close()}>✕</button>
     </header>
 
     <div class="grid">
       <label class="field wide">Name<input bind:value={company.name} required /></label>
+      {#if hasSharedDirectory()}
+        <div class="field wide">
+          <span>Verzeichnis</span>
+          <div class="seg" role="radiogroup" aria-label="Verzeichnis">
+            {#each ['private', 'shared'] as const as d (d)}
+              <label class="segopt" class:on={directory === d} class:shared={d === 'shared'}>
+                <input type="radio" name="directory" value={d} bind:group={directory} />
+                {d === 'private' ? 'Privat – nur für dich' : 'Gemeinsam – für alle Mitglieder'}
+              </label>
+            {/each}
+          </div>
+        </div>
+      {/if}
       {#if duplicateCompany}
         <div class="wide notice warn small">Mögliche Dublette: „{duplicateCompany.name}“ existiert bereits.</div>
       {/if}
@@ -146,6 +180,9 @@
 
     <footer class="row">
       {#if !isNew}<button type="button" class="danger" onclick={remove}>Löschen</button>{/if}
+      {#if !isNew && hasSharedDirectory()}
+        <button type="button" class="ghost" onclick={copyToOther}>Kopie in „{DIRECTORY_LABEL[otherDirectory]}“</button>
+      {/if}
       <span class="grow"></span>
       <button type="button" class="secondary" onclick={() => dialog.close()}>Abbrechen</button>
       <button type="submit">Speichern</button>
@@ -166,5 +203,13 @@
     .grid, .locgrid { grid-template-columns: 1fr; }
     .span2 { grid-column: auto; }
   }
-  .badge.shared { background: #ffd9be; color: #5e2900; }
+  .seg { display: flex; gap: 1px; }
+  .segopt {
+    flex: 1; display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer;
+    border: 1px solid var(--border); font-size: 14px;
+  }
+  .segopt input { margin: 0; }
+  .segopt.on { border-color: var(--accent); background: var(--tag-blue-bg); color: var(--tag-blue-fg); }
+  .segopt.on.shared { border-color: #ff832b; background: var(--tag-orange-bg); color: var(--tag-orange-fg); }
+  @media (max-width: 600px) { .seg { flex-direction: column; } }
 </style>

@@ -170,6 +170,7 @@ export function startStore() {
 // ---------- Nur lokal gespeicherte Werte (nicht im Backup, nie synchronisiert) ----------
 
 const ORS_KEY = 'switchtracker.orsKey';
+const NEW_COMPANY_DIR_KEY = 'switchtracker.newCompanyDirectory';
 
 function readLocal(key: string): string {
   try { return localStorage.getItem(key) ?? ''; } catch { return ''; }
@@ -177,6 +178,13 @@ function readLocal(key: string): string {
 
 class LocalPrefs {
   orsKey = $state(readLocal(ORS_KEY));
+  /** Verzeichnis, in das neue Unternehmen standardmäßig kommen (zuletzt gewähltes) */
+  newCompanyDirectory = $state<'private' | 'shared'>(readLocal(NEW_COMPANY_DIR_KEY) === 'shared' ? 'shared' : 'private');
+
+  setNewCompanyDirectory(value: 'private' | 'shared') {
+    this.newCompanyDirectory = value;
+    try { localStorage.setItem(NEW_COMPANY_DIR_KEY, value); } catch { /* privater Modus */ }
+  }
 
   setOrsKey(value: string) {
     this.orsKey = value.trim();

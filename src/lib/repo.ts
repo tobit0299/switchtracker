@@ -1,4 +1,3 @@
-import { directoryRealmId } from './cloud.svelte';
 import { db, newId } from './db';
 import type { ProcessedFile } from './documents';
 import type { Company, Home, Job, JobDocument, Location } from './types';
@@ -20,19 +19,43 @@ export function emptyLocation(companyId: string): Location {
   return { id: newId(), companyId, label: '', street: '', zip: '', city: '', state: '', country: 'DE', createdAt: now(), updatedAt: now() };
 }
 
-/** Neue Einträge des Unternehmensverzeichnisses landen im gemeinsamen Realm, sofern es einen gibt. */
-function withRealm<T extends { realmId?: string }>(obj: T, fallback?: string): T {
-  const realmId = obj.realmId ?? fallback ?? directoryRealmId();
-  return realmId ? { ...obj, realmId } : obj;
-}
-
+/** Das Verzeichnis (Realm) bestimmt der Aufrufer über `c.realmId`; ohne realmId ist es privat. */
 export async function saveCompany(c: Company) {
-  await db.companies.put(withRealm({ ...c, updatedAt: now() }));
+  await db.companies.put({ ...c, updatedAt: now() });
 }
 
+/** Standorte liegen immer im selben Verzeichnis wie ihr Unternehmen. */
 export async function saveLocation(l: Location) {
   const company = await db.companies.get(l.companyId);
-  await db.locations.put(withRealm({ ...l, updatedAt: now() }, company?.realmId));
+  const { realmId: _old, ...rest } = l;
+  await db.locations.put({ ...rest, ...(company?.realmId ? { realmId: company.realmId } : {}), updatedAt: now() });
+}
+
+/** Verschiebt ein Unternehmen samt Standorten in ein anderes Verzeichnis. */
+export async function moveCompany(id: string, realmId: string) {
+  await db.transaction('rw', db.companies, db.locations, async () => {
+    await db.companies.update(id, { realmId, updatedAt: now() });
+    await db.locations.where('companyId').equals(id).modify({ realmId, updatedAt: now() });
+  });
+}
+
+/** Legt eine unabhängige Kopie samt Standorten in einem anderen Verzeichnis an; liefert die neue ID. */
+export async function copyCompany(id: string, realmId: string | undefined): Promise<string> {
+  const c = await db.companies.get(id);
+  if (!c) throw new Error('Unternehmen nicht gefunden.');
+  const t = now();
+  const realm = realmId ? { realmId } : {};
+  const { realmId: _r, owner: _o, ...base } = c as Company & { owner?: string };
+  const copy: Company = { ...base, ...realm, id: newId(), createdAt: t, updatedAt: t };
+  const locations = (await db.locations.where('companyId').equals(id).toArray()).map(l => {
+    const { realmId: _lr, owner: _lo, ...lb } = l as Location & { owner?: string };
+    return { ...lb, ...realm, id: newId(), companyId: copy.id, createdAt: t, updatedAt: t };
+  });
+  await db.transaction('rw', db.companies, db.locations, async () => {
+    await db.companies.add(copy);
+    await db.locations.bulkAdd(locations);
+  });
+  return copy.id;
 }
 
 /** Löscht den Standort und löst die Verknüpfung betroffener Stellen. */

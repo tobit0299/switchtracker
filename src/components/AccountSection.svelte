@@ -4,6 +4,7 @@
 
   let inviteEmail = $state('');
   let inviteName = $state('');
+  let takeOverOwn = $state(false);
   let busy = $state(false);
   let message = $state('');
   let error = $state('');
@@ -61,7 +62,7 @@
     {#each cloud.pendingInvites as inv (inv.id)}
       <div class="notice warn invite">
         <strong>{inv.invitedBy?.name || inv.invitedBy?.email || 'Jemand'}</strong> lädt dich ein in „{inv.realm?.name ?? 'geteilte Daten'}“.
-        Beim Annehmen wandern deine bisherigen Unternehmen in das gemeinsame Verzeichnis.
+        Deine bisherigen Unternehmen bleiben privat; einzelne kannst du danach unter Datenbank → Unternehmen ins gemeinsame Verzeichnis verschieben.
         <div class="row">
           <button class="sm" disabled={busy} onclick={() => run(() => acceptInvite(inv as Invite), 'Einladung angenommen.')}>Annehmen</button>
           <button class="ghost sm" disabled={busy} onclick={() => run(() => inv.reject())}>Ablehnen</button>
@@ -72,15 +73,21 @@
     <h3>Gemeinsames Unternehmensverzeichnis</h3>
     {#if !cloud.directoryRealm}
       <p class="muted small">
-        Unternehmen und Standorte sind bisher nur für dich sichtbar. Lege ein gemeinsames Verzeichnis an, um sie mit
-        einer zweiten Person zu teilen. Stellen, Notizen, Dokumente und Heimadressen bleiben immer privat.
+        Unternehmen und Standorte liegen bisher in deinem privaten Verzeichnis. Lege zusätzlich ein gemeinsames Verzeichnis an,
+        um ausgewählte Unternehmen mit einer zweiten Person zu teilen; das private Verzeichnis bleibt bestehen.
+        Stellen, Notizen, Dokumente und Heimadressen bleiben immer privat.
       </p>
+      <label class="check small"><input type="checkbox" bind:checked={takeOverOwn} /> Alle bisherigen Unternehmen gleich ins gemeinsame Verzeichnis übernehmen</label>
       <div class="row">
-        <button class="secondary" disabled={busy} onclick={() => run(createDirectory, 'Gemeinsames Verzeichnis angelegt. Du kannst jetzt jemanden einladen.')}>
+        <button class="secondary" disabled={busy} onclick={() => run(() => createDirectory(takeOverOwn), 'Gemeinsames Verzeichnis angelegt. Du kannst jetzt jemanden einladen.')}>
           Gemeinsames Verzeichnis anlegen
         </button>
       </div>
     {:else}
+      <p class="muted small">
+        Jedes Unternehmen liegt entweder privat oder im gemeinsamen Verzeichnis. Zuordnen lässt es sich unter
+        Datenbank → Unternehmen (Spalte „Verzeichnis“) oder im Unternehmensdialog.
+      </p>
       <ul class="members">
         <li><span class="grow">{cloud.email} (du)</span><span class="muted small">{cloud.directoryRealm.owner === cloud.userId ? 'Eigentümer' : 'Mitglied'}</span></li>
         {#each cloud.directoryMembers.filter(m => m.email !== cloud.email) as m (m.id)}
@@ -120,5 +127,6 @@
   .members li { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
   .inviteform { display: grid; grid-template-columns: 2fr 1fr auto; gap: 1px; }
   .logout { margin-top: 8px; }
+  .check { display: flex; align-items: center; gap: 8px; }
   @media (max-width: 600px) { .inviteform { grid-template-columns: 1fr; } }
 </style>

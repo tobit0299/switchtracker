@@ -54,25 +54,41 @@ export async function logout() {
   await db.cloud.logout();
 }
 
-/** Realm-ID, in die neue Unternehmen und Standorte gehören (undefined = privat bzw. Gastmodus). */
-export function directoryRealmId(): string | undefined {
-  return cloud.loggedIn ? cloud.directoryRealm?.realmId : undefined;
+// ---------- Verzeichnisse: privat oder gemeinsam ----------
+
+/**
+ * Jedes Unternehmen liegt samt Standorten in genau einem Verzeichnis: privat (eigener Realm,
+ * im Gastmodus ohne realmId) oder im gemeinsamen Realm. Dexie Cloud erlaubt pro Datensatz nur einen Realm.
+ */
+export type Directory = 'private' | 'shared';
+
+export const DIRECTORY_LABEL: Record<Directory, string> = { private: 'Privat', shared: 'Gemeinsam' };
+
+/** Gibt es ein gemeinsames Verzeichnis, zwischen dem und dem privaten man wählen kann? */
+export function hasSharedDirectory(): boolean {
+  return cloud.loggedIn && !!cloud.directoryRealm;
 }
 
-/** Verschiebt alle eigenen (privaten) Unternehmen und Standorte in den gemeinsamen Realm. */
-async function moveDirectoryInto(realmId: string) {
+export function directoryOf(c: { realmId?: string } | null | undefined): Directory {
+  return isSharedCompany(c) ? 'shared' : 'private';
+}
+
+/** Realm-ID eines Verzeichnisses (undefined = privat im Gastmodus). */
+export function realmIdOf(d: Directory): string | undefined {
+  if (d === 'shared') return cloud.directoryRealm?.realmId;
+  return cloud.loggedIn ? cloud.userId : undefined;
+}
+
+/** Legt das gemeinsame Unternehmensverzeichnis an; auf Wunsch wandern alle eigenen Unternehmen hinein. */
+export async function createDirectory(takeOverOwn = false) {
+  if (cloud.directoryRealm) return;
+  const realmId = await db.realms.add({ name: DIRECTORY_REALM_NAME });
+  if (!takeOverOwn) return;
   const isPrivate = (o: { realmId?: string }) => !o.realmId || o.realmId === cloud.userId;
   await db.transaction('rw', db.companies, db.locations, async () => {
     await db.companies.filter(isPrivate).modify({ realmId });
     await db.locations.filter(isPrivate).modify({ realmId });
   });
-}
-
-/** Legt das gemeinsame Unternehmensverzeichnis an und übernimmt die eigenen Unternehmen. */
-export async function createDirectory() {
-  if (cloud.directoryRealm) return;
-  const realmId = await db.realms.add({ name: DIRECTORY_REALM_NAME });
-  await moveDirectoryInto(realmId);
 }
 
 /** Lädt eine Person per E-Mail ins gemeinsame Verzeichnis ein (volle Bearbeitungsrechte). */
@@ -88,10 +104,9 @@ export async function removeMember(id: string) {
   await db.members.delete(id);
 }
 
-/** Nimmt eine Einladung an; eigene Unternehmen wandern dann ins gemeinsame Verzeichnis. */
+/** Nimmt eine Einladung an; die eigenen Unternehmen bleiben privat. */
 export async function acceptInvite(invite: Invite) {
   await invite.accept();
-  if (invite.realm?.name === DIRECTORY_REALM_NAME) await moveDirectoryInto(invite.realmId);
 }
 
 // ---------- Herkunft der angezeigten Daten (für Hinweise in der Oberfläche) ----------
@@ -109,15 +124,24 @@ function otherMembers(): string[] {
     .map(m => m.name || m.email || m.userId || '?');
 }
 
-/** Ob das Unternehmensverzeichnis eigen oder geteilt ist. */
-export function directorySource(): { kind: 'guest' | 'own' | 'shared'; label: string; detail: string } {
+/**
+ * Aus welchem Verzeichnis die angezeigten Unternehmen stammen.
+ * `filter` = Verzeichnisfilter der Tabelle ('' = alle Verzeichnisse).
+ */
+export function directorySource(filter: Directory | '' = ''): { kind: 'guest' | 'own' | 'shared' | 'mixed'; label: string; detail: string } {
   if (!cloud.loggedIn) return { kind: 'guest', label: 'Eigenes Verzeichnis (Gastmodus)', detail: 'Unternehmen liegen nur in diesem Browser.' };
-  if (!cloud.directoryRealm) return { kind: 'own', label: 'Eigenes Verzeichnis', detail: 'Nur für dich sichtbar. Teilen lässt es sich in den Einstellungen.' };
+  const own = { kind: 'own' as const, label: 'Privates Verzeichnis', detail: 'Nur für dich sichtbar.' };
+  if (!cloud.directoryRealm) return { ...own, detail: 'Nur für dich sichtbar. Ein gemeinsames Verzeichnis lässt sich in den Einstellungen anlegen.' };
+  if (filter === 'private') return own;
   const others = otherMembers();
+  const withWhom = others.length ? ` mit ${others.join(', ')}` : '';
+  if (filter === 'shared') {
+    return { kind: 'shared', label: `Gemeinsames Verzeichnis${withWhom}`, detail: 'Alle Mitglieder sehen und bearbeiten diese Unternehmen und Standorte.' };
+  }
   return {
-    kind: 'shared',
-    label: others.length ? `Gemeinsames Verzeichnis mit ${others.join(', ')}` : 'Gemeinsames Verzeichnis',
-    detail: 'Alle Mitglieder sehen und bearbeiten diese Unternehmen und Standorte.',
+    kind: 'mixed',
+    label: `Privates und gemeinsames Verzeichnis${withWhom}`,
+    detail: 'Private Unternehmen sieht nur du, gemeinsame alle Mitglieder. Zuordnung unter Datenbank → Unternehmen oder im Unternehmensdialog.',
   };
 }
 

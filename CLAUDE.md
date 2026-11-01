@@ -11,7 +11,7 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
 
 ## Befehle
 
-- Versionsnummer in `package.json` bei neuen Funktionen erhöhen (aktuell 0.3.0); sie wird in den Einstellungen angezeigt.
+- Versionsnummer in `package.json` bei neuen Funktionen erhöhen (aktuell 0.4.0); sie wird in den Einstellungen angezeigt.
 
 - `npm run dev`: Entwicklungsserver (Basis `/`)
 - `npm run check`: svelte-check und TypeScript, muss fehlerfrei sein
@@ -39,16 +39,16 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
 - **Gastmodus:** ohne Anmeldung nutzbar, alle Daten nur im Browser des Gastes, mit dauerhaft sichtbarem Hinweis. Beispieldaten optional ladbar. Ohne ORS-Schlüssel: Karte und Luftlinie; Fahrzeiten erst mit eigenem Schlüssel.
 - **Anmeldung (Dexie Cloud, kostenloser Plan mit 3 Produktivnutzern):**
   - Jeder Nutzer hat eigene Stellen, Notizen, Dokumente, Heimadressen und Einstellungen.
-  - Das **Unternehmensverzeichnis (Unternehmen + Standorte) wird zwischen den Nutzern geteilt**.
+  - Unternehmen + Standorte liegen je Unternehmen **entweder im privaten Verzeichnis oder im gemeinsamen Unternehmensverzeichnis** (genau eins, verschiebbar; Dexie Cloud erlaubt pro Datensatz nur einen Realm). Wer ein Unternehmen in beiden braucht, legt eine unabhängige Kopie an. Mehrere geteilte Verzeichnisse sind bewusst nicht vorgesehen.
   - Fremdregistrierungen müssen verhindert werden (Nutzerrichtlinie der Datenbank in Dexie Cloud; noch nicht eingerichtet und nicht verifiziert).
   - Konfiguration in `db.ts`: `requireAuth: false` (Gastmodus bleibt), `nameSuffix: false` (gleiche IndexedDB wie im Gastmodus, sonst leere neue DB), `unsyncedTables: ['settings']` (Schlüssel wie `activeHomeId` würden zwischen Nutzern kollidieren), `blobMode: 'lazy'`.
   - Verhalten laut Addon-Quellcode: Gastdaten werden beim ersten Anmelden ins Konto übernommen; Abmelden leert die lokale Datenbank des Geräts (Geodaten-DB bleibt). Der allererste Start mit Cloud-URL wartet auf einen ersten Abgleich mit dem Server (Internet nötig).
-  - Gemeinsames Verzeichnis: Realm mit Name „Unternehmensverzeichnis“; Unternehmen/Standorte bekommen dessen `realmId` (`repo.ts`), Einladung per `db.members` mit `permissions: { manage: '*' }`. Beim Anlegen bzw. Annehmen wandern die eigenen privaten Unternehmen in den Realm.
+  - Gemeinsames Verzeichnis: Realm mit Name „Unternehmensverzeichnis“, Einladung per `db.members` mit `permissions: { manage: '*' }`. Privat = `realmId` des Nutzers (`userId`, im Gastmodus keine). Das Verzeichnis wählt der Aufrufer (`realmIdOf` in `cloud.svelte.ts`), `repo.ts` setzt Standorte immer auf den Realm ihres Unternehmens; `moveCompany` verschiebt samt Standorten, `copyCompany` kopiert. Neue Unternehmen kommen ins zuletzt gewählte Verzeichnis (localStorage, Standard privat). Beim Anlegen des Verzeichnisses optional alle eigenen übernehmen; beim Annehmen einer Einladung bleibt alles privat.
 - Jeder Nutzer und jeder Gast trägt seinen eigenen ORS-Schlüssel ein. Der Schlüssel bleibt lokal auf dem Gerät und wird nicht synchronisiert.
 
 ## Datenmodell (drei getrennte Bereiche)
 
-1. **Unternehmensverzeichnis (geteilt):** `companies` (Name, Branche, Bewertung, Website, Notizen) und `locations` (Standorte eines Unternehmens, strukturierte Adresse: Straße, PLZ, Ort, Bundesland, Land). Ein Unternehmen hat 1–n Standorte.
+1. **Unternehmensverzeichnis (privat oder geteilt):** `companies` (Name, Branche, Bewertung, Website, Notizen) und `locations` (Standorte eines Unternehmens, strukturierte Adresse: Straße, PLZ, Ort, Bundesland, Land). Ein Unternehmen hat 1–n Standorte.
 2. **Stellenverzeichnis (pro Nutzer):** `jobs` mit Titel, Kennziffer der Ausschreibung (`reference`, optional), Stellenlink, Arbeitsmodell, Status (Pipeline), **Relevanz**, Fristen/Wiedervorlage und Notizen.
    - Verknüpfung zu Unternehmen (`companyId`) und Standort (`locationId`) optional.
    - Remote-Stellen brauchen keinen Standort.
@@ -78,8 +78,8 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
 2. **Unternehmenskarte:** gleiches Layout, eine Zeile je Standort des Unternehmensverzeichnisses, Marker **orange**. Filter: Suche, Branche, Bewertung ab, „mit/ohne eigene Stellen“, Radius. Eigene Spaltenauswahl (`companyMapColumns`, Standard: Unternehmen, Ort, Bewertung). Infokasten mit Luftlinie, Fahrzeit, Anzahl eigener Stellen, Route und „Unternehmen öffnen“.
 3. **Datenbank** mit Unterreitern:
    - **Stellen:** vollständige Tabelle mit allen Feldern („Kennziffer“, „Relevanz Stelle“, „Bewertung Unternehmen“), Filter, „Neue Stelle“. Auswahl „Luftlinie und Fahrzeit ab“ (setzt die aktive Heimadresse); die Spaltenköpfe nennen die Bezugsadresse.
-   - **Unternehmen:** vollständige Tabelle mit Unternehmen und Standorten; mit gemeinsamem Verzeichnis zusätzlich Spalte „Verzeichnis“ (Gemeinsam / Nur ich).
-- **Herkunfts-Plakette** (`SourceTag`, Logik in `cloud.svelte.ts`) unter den Überschriften: bei Stellen „Gastmodus“ bzw. „Profil <E-Mail>“, bei Unternehmen „Eigenes Verzeichnis (Gastmodus)“, „Eigenes Verzeichnis“ oder „Gemeinsames Verzeichnis mit <Mitglieder>“ (orange). In der Unternehmenskarte zeigt ein Personen-Symbol geteilte Unternehmen, im Unternehmensdialog eine Plakette den Speicherort.
+   - **Unternehmen:** vollständige Tabelle mit Unternehmen und Standorten; mit gemeinsamem Verzeichnis zusätzlich Filter und sortierbare Spalte „Verzeichnis“ mit Auswahl Privat/Gemeinsam zum Verschieben (Rückfrage beim Verschieben ins Private).
+- **Herkunfts-Plakette** (`SourceTag`, Logik in `cloud.svelte.ts`) unter den Überschriften: bei Stellen „Gastmodus“ bzw. „Profil <E-Mail>“, bei Unternehmen je nach Verzeichnisfilter „Eigenes Verzeichnis (Gastmodus)“, „Privates Verzeichnis“, „Gemeinsames Verzeichnis mit <Mitglieder>“ (orange) oder „Privates und gemeinsames Verzeichnis mit …“. Farben: privat blau, gemeinsam orange (Tokens `--tag-orange-*`). In der Unternehmenskarte zeigt ein Personen-Symbol geteilte Unternehmen und es gibt denselben Verzeichnisfilter. Im Unternehmensdialog Auswahl „Verzeichnis“ (Privat/Gemeinsam) und „Kopie in …“.
 4. **Einstellungen:** kein Reiter, sondern Zahnrad oben rechts. ORS-Schlüssel, Konto und Synchronisation, Profil, Heimadressen, Dokumente (Komprimierung/OCR), Karte („Position korrigieren“ an/aus, Standard aus), Backup. Ganz unten die Versionsanzeige: Version aus `package.json`, Commit (lokal per `git`, im Deployment aus `GITHUB_SHA`) und Build-Zeitpunkt, eingesetzt über `define` in `vite.config.ts`.
 - Fahrzeiten werden für alle Standorte des Verzeichnisses berechnet (nicht nur für solche mit Stellen), weil die Unternehmenskarte sie anzeigt.
 
@@ -122,7 +122,7 @@ Umgesetzt, aber noch nicht getestet oder nur teilweise fertig:
 - **Position korrigieren** (Marker ziehen): implementiert, standardmäßig aus, das Verschieben selbst ist nicht getestet.
 - **Unternehmensdialog:** Anlegen, Bearbeiten, Standorte, Dublettenhinweise und „Erneut suchen“ implementiert, nicht durchgeklickt.
 - **Backup:** JSON-Export und -Wiederherstellung, „Alle Daten löschen“ und „Geodaten-Cache leeren“ implementiert, nicht getestet. Backups sind nur manuell möglich.
-- **Dexie Cloud:** Datenbank `https://z9j3u4eev.dexie.cloud` ist angelegt, als Repository-Variable `DEXIE_CLOUD_URL` hinterlegt und live eingebunden (01.11.2026: erster Abgleich auf GitHub Pages erfolgreich, App lädt). **Noch nicht getestet:** Anmeldung, Übernahme der Gastdaten, gemeinsames Verzeichnis, Einladung und Annahme durch die zweite Person. Sperre gegen Fremdregistrierungen fehlt weiterhin.
+- **Dexie Cloud:** Datenbank `https://z9j3u4eev.dexie.cloud` ist angelegt, als Repository-Variable `DEXIE_CLOUD_URL` hinterlegt und live eingebunden (01.11.2026: erster Abgleich auf GitHub Pages erfolgreich, App lädt). **Noch nicht getestet:** Anmeldung, Übernahme der Gastdaten, gemeinsames Verzeichnis, Einladung und Annahme durch die zweite Person. Privat/gemeinsam (Verschieben, Kopie, Filter, Plaketten) nur im Entwicklungsserver mit simuliertem Anmeldezustand geprüft (01.11.2026), das echte Verschieben zwischen Realms in Dexie Cloud nicht. Sperre gegen Fremdregistrierungen fehlt weiterhin.
 - **Dokumenten-Upload über den Dateidialog** selbst (das Browser-Pane kann keine Dateien wählen); Aufbereitung und Anzeige sind getestet.
 - **Profil:** Name und E-Mail werden nur lokal gespeichert und haben keine weitere Funktion.
 - **Mobile Ansicht:** Layout bricht unter 800 px um, ist aber nicht gezielt auf Smartphones getestet.

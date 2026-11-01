@@ -19,6 +19,7 @@
   import MapView, { type MapPoint } from './MapView.svelte';
   import RadiusField from './RadiusField.svelte';
   import SourceTag from './SourceTag.svelte';
+  import { directoryOf, hasSharedDirectory, type Directory } from '../lib/cloud.svelte';
   import StarRating from './StarRating.svelte';
 
   // ---------- Filter und Sortierung ----------
@@ -26,16 +27,18 @@
   let industry = $state('');
   let minRating = $state(0);
   let jobsFilter = $state<'all' | 'with' | 'without'>('all');
+  let dirFilter = $state<Directory | ''>('');
+  const showDir = $derived(hasSharedDirectory());
   let sortKey = $state<CompanyColumnKey>('company');
   let sortAsc = $state(true);
   let pickingColumns = $state(false);
 
   const columns = $derived(store.companyMapColumns.map(k => companyColumnByKey.get(k)!));
   const industries = $derived([...new Set(store.companies.map(c => c.industry).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de')));
-  const filtersActive = $derived(!!q.trim() || !!industry || minRating > 0 || jobsFilter !== 'all' || store.radiusKm != null);
+  const filtersActive = $derived(!!q.trim() || !!industry || minRating > 0 || jobsFilter !== 'all' || !!dirFilter || store.radiusKm != null);
 
   function resetFilters() {
-    q = ''; industry = ''; minRating = 0; jobsFilter = 'all';
+    q = ''; industry = ''; minRating = 0; jobsFilter = 'all'; dirFilter = '';
     if (store.radiusKm != null) void setSetting('radiusKm', null);
   }
 
@@ -48,6 +51,7 @@
     if (minRating && (r.company?.rating ?? 0) < minRating) return false;
     if (jobsFilter === 'with' && !r.jobCount) return false;
     if (jobsFilter === 'without' && r.jobCount) return false;
+    if (showDir && dirFilter && directoryOf(r.company) !== dirFilter) return false;
     return true;
   }
 
@@ -121,7 +125,7 @@
           <Column size={20} />
         </button>
       </div>
-      <div class="srcline"><SourceTag of="companies" /></div>
+      <div class="srcline"><SourceTag of="companies" filter={showDir ? dirFilter : ''} /></div>
 
       <RadiusField />
 
@@ -135,11 +139,18 @@
           <option value={0}>Jede Bewertung</option>
           {#each [1, 2, 3, 4, 5] as n (n)}<option value={n}>ab {'★'.repeat(n)}</option>{/each}
         </select>
-        <select class="wide" bind:value={jobsFilter} aria-label="Stellen am Standort">
+        <select class:wide={!showDir} bind:value={jobsFilter} aria-label="Stellen am Standort">
           <option value="all">Alle Standorte</option>
           <option value="with">Nur mit eigenen Stellen</option>
           <option value="without">Nur ohne eigene Stellen</option>
         </select>
+        {#if showDir}
+          <select bind:value={dirFilter} aria-label="Verzeichnis">
+            <option value="">Alle Verzeichnisse</option>
+            <option value="private">Nur privat</option>
+            <option value="shared">Nur gemeinsam</option>
+          </select>
+        {/if}
       </div>
     </div>
 

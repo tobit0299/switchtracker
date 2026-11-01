@@ -33,6 +33,7 @@
   --tag-blue-bg: #d0e2ff; --tag-blue-fg: #0043ce;
   --tag-green-bg: #a7f0ba; --tag-green-fg: #0e6027;
   --tag-gray-bg: #e0e0e0; --tag-gray-fg: #161616;
+  --tag-orange-bg: #ffd9be; --tag-orange-fg: #5e2900;
   --shell: #161616;           /* UI-Shell-Kopfzeile, in beiden Themes dunkel */
   --shell-text: #f4f4f4;
   --shell-muted: #c6c6c6;
@@ -73,6 +74,7 @@
     --tag-blue-bg: #0043ce; --tag-blue-fg: #d0e2ff;
     --tag-green-bg: #0e6027; --tag-green-fg: #a7f0ba;
     --tag-gray-bg: #525252; --tag-gray-fg: #f4f4f4;
+    --tag-orange-bg: #5e2900; --tag-orange-fg: #ffd9be;
     --overlay: rgba(0, 0, 0, 0.6);
     color-scheme: dark;
   }
