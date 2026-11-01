@@ -7,6 +7,17 @@
     /** Zeilennummer(n) aus der gefilterten Tabelle, im Marker angezeigt */
     label: string;
   }
+
+  export interface HomeMarker {
+    id: string;
+    coord: { lat: number; lon: number };
+    name: string;
+    /** aktive Heimadresse (grün); andere grau */
+    active: boolean;
+  }
+
+  /** Farbe der Standort-Marker: Stellenkarte blau, Unternehmenskarte orange */
+  export type MapVariant = 'job' | 'company';
 </script>
 
 <script lang="ts">
@@ -20,29 +31,37 @@
 
   let {
     points,
+    variant = 'job',
     home,
+    homes = [],
     radiusKm,
     selectedId,
     route,
     draggableId = null,
     onselect,
     onmoved,
+    onhomeclick,
   }: {
     points: MapPoint[];
+    variant?: MapVariant;
+    /** aktive Heimadresse: Mittelpunkt für Radius-Kreis */
     home: Coord | null;
+    /** anzuzeigende Heimadressen als Haus-Symbole */
+    homes?: HomeMarker[];
     radiusKm: number | null;
     selectedId: string | null;
     route: LineString | null;
     draggableId?: string | null;
     onselect: (id: string) => void;
     onmoved?: (id: string, coord: Coord) => void;
+    onhomeclick?: (id: string) => void;
   } = $props();
 
   let container: HTMLDivElement;
   let map = $state<maplibregl.Map | null>(null);
   let ready = $state(false);
   const markers = new Map<string, maplibregl.Marker>();
-  let homeMarker: maplibregl.Marker | null = null;
+  const homeMarkers = new Map<string, maplibregl.Marker>();
   /** Solange der Nutzer die Karte nicht selbst bewegt hat, wird bei neuen Punkten neu eingepasst */
   let userMoved = false;
   let lastFitCount = -1;
@@ -71,7 +90,7 @@
       m.addSource('route', { type: 'geojson', data: empty });
       m.addLayer({
         id: 'route', type: 'line', source: 'route',
-        paint: { 'line-color': '#ff832b', 'line-width': 5, 'line-opacity': 0.85 },
+        paint: { 'line-color': '#8a3ffc', 'line-width': 5, 'line-opacity': 0.85 },
         layout: { 'line-join': 'round', 'line-cap': 'round' },
       });
       ready = true;
@@ -99,7 +118,7 @@
     for (const p of points) {
       let mk = markers.get(p.id);
       if (!mk) {
-        const el = markerEl('num', p.title);
+        const el = markerEl(`num ${variant}`, p.title);
         el.addEventListener('click', e => { e.stopPropagation(); onselect(p.id); });
         mk = new maplibregl.Marker({ element: el });
         mk.on('dragend', () => { const ll = mk!.getLngLat(); onmoved?.(p.id, { lat: ll.lat, lon: ll.lng }); });
@@ -117,11 +136,31 @@
     }
   });
 
-  // Heimadresse
+  // Haus-Symbol (Carbon „Home“, 32er Raster)
+  const HOUSE_SVG = '<svg viewBox="0 0 32 32" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M16.61,2.21a1,1,0,0,0-1.24,0L1,13.42,2.24,15,4,13.62V26a2,2,0,0,0,2,2H26a2,2,0,0,0,2-2V13.63L29.76,15,31,13.43ZM18,26H14V18h4Zm2,0V18a2,2,0,0,0-2-2H14a2,2,0,0,0-2,2v8H6V12.06L16,4.27l10,7.8V26Z"/></svg>';
+
+  // Heimadressen abgleichen: aktive grün, weitere grau (Klick macht sie aktiv)
   $effect(() => {
     if (!map) return;
-    homeMarker?.remove();
-    homeMarker = home ? new maplibregl.Marker({ element: markerEl('home', 'Heimadresse') }).setLngLat([home.lon, home.lat]).addTo(map) : null;
+    const m = map;
+    const wanted = new Set(homes.map(h => h.id));
+    for (const [id, mk] of homeMarkers) if (!wanted.has(id)) { mk.remove(); homeMarkers.delete(id); }
+    for (const h of homes) {
+      let mk = homeMarkers.get(h.id);
+      if (!mk) {
+        const el = markerEl('home', h.name);
+        el.innerHTML = HOUSE_SVG;
+        el.addEventListener('click', e => { e.stopPropagation(); onhomeclick?.(h.id); });
+        mk = new maplibregl.Marker({ element: el }).setLngLat([h.coord.lon, h.coord.lat]).addTo(m);
+        homeMarkers.set(h.id, mk);
+      } else {
+        mk.setLngLat([h.coord.lon, h.coord.lat]);
+      }
+      const el = mk.getElement();
+      el.classList.toggle('active', h.active);
+      el.title = h.active ? `${h.name} (aktive Heimadresse)` : `${h.name} – klicken, um sie als Heimadresse zu verwenden`;
+      el.style.zIndex = h.active ? '3' : '0';
+    }
   });
 
   // Radius-Kreis
@@ -165,11 +204,12 @@
   // Alles einpassen, sobald Punkte hinzukommen (z. B. während die Adresssuche läuft),
   // bis der Nutzer die Karte selbst verschiebt oder zoomt
   $effect(() => {
-    const count = points.length + (home ? 1 : 0);
+    const count = points.length + (home ? 1 : 0) + homes.length;
     if (!map || userMoved || !count || count === lastFitCount) return;
     const b = new maplibregl.LngLatBounds();
     points.forEach(p => b.extend([p.coord.lon, p.coord.lat]));
     if (home) b.extend([home.lon, home.lat]);
+    homes.forEach(h => b.extend([h.coord.lon, h.coord.lat]));
     map.fitBounds(b, { padding: 50, maxZoom: 11, duration: lastFitCount < 0 ? 0 : 300 });
     lastFitCount = count;
   });
@@ -191,13 +231,24 @@
     width: 14px; height: 14px; border-radius: 50%; background: #0f62fe;
     border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); cursor: pointer;
   }
-  :global(.mk.home) { background: #24a148; width: 18px; height: 18px; border-radius: 0; cursor: default; }
+  /* Heimadresse als Haus: aktiv grün, weitere grau */
+  :global(.mk.home) {
+    width: 26px; height: 26px; border-radius: 4px; background: #8d8d8d; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+  }
+  :global(.mk.home.active) { background: #24a148; width: 30px; height: 30px; cursor: default; }
   /* nummerierter Standort: Pille, wächst bei mehreren Nummern in die Breite */
   :global(.mk.num) {
     width: auto; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px;
     display: flex; align-items: center; justify-content: center;
     font: 600 11px/1 'IBM Plex Sans', system-ui, sans-serif; color: #fff; white-space: nowrap;
   }
-  :global(.mk.num.selected) { background: #ff832b; min-width: 28px; height: 28px; border-radius: 14px; font-size: 13px; color: #161616; }
-  :global(.mk.dragging) { outline: 3px dashed #ff832b; outline-offset: 3px; cursor: grab; }
+  :global(.mk.num.job) { background: #0f62fe; }
+  :global(.mk.num.company) { background: #ff832b; color: #161616; }
+  /* Auswahl: größer und mit dunklem Ring, Farbe bleibt */
+  :global(.mk.num.selected) {
+    min-width: 30px; height: 30px; border-radius: 15px; font-size: 13px;
+    box-shadow: 0 0 0 3px #161616, 0 2px 6px rgba(0, 0, 0, 0.4);
+  }
+  :global(.mk.dragging) { outline: 3px dashed #161616; outline-offset: 3px; cursor: grab; }
 </style>

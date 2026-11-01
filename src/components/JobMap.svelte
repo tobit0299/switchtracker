@@ -1,10 +1,10 @@
 <script lang="ts">
   import Close from 'carbon-icons-svelte/lib/Close.svelte';
-  import View from 'carbon-icons-svelte/lib/View.svelte';
   import Column from 'carbon-icons-svelte/lib/Column.svelte';
   import FilterRemove from 'carbon-icons-svelte/lib/FilterRemove.svelte';
+  import View from 'carbon-icons-svelte/lib/View.svelte';
   import type { LineString } from 'geojson';
-  import { columnByKey, compareRows, type ColumnKey } from '../lib/columns';
+  import { COLUMNS, DEFAULT_OVERVIEW_COLUMNS, columnByKey, compareRows, type ColumnKey } from '../lib/columns';
   import { daysUntil, fmtDuration, fmtKm } from '../lib/format';
   import { locationAddress, locationGeoRequest } from '../lib/geo/keys';
   import { getRoute, setManualPosition } from '../lib/geo/services.svelte';
@@ -15,7 +15,9 @@
   import ColumnPicker from './ColumnPicker.svelte';
   import HomeBar from './HomeBar.svelte';
   import JobCell from './JobCell.svelte';
+  import MapLayout from './MapLayout.svelte';
   import MapView, { type MapPoint } from './MapView.svelte';
+  import RadiusField from './RadiusField.svelte';
 
   // ---------- Filter und Sortierung der kompakten Tabelle ----------
   let q = $state('');
@@ -34,11 +36,6 @@
     if (store.radiusKm != null) void setSetting('radiusKm', null);
   }
 
-  function setRadius(value: string) {
-    const n = parseFloat(value.replace(',', '.'));
-    void setSetting('radiusKm', Number.isFinite(n) && n > 0 ? n : null);
-  }
-
   function inRadius(r: JobRow): boolean {
     const radius = store.radiusKm;
     if (!radius || !store.activeHomeCoord) return true;
@@ -49,7 +46,7 @@
 
   function matches(r: JobRow): boolean {
     const text = q.trim().toLowerCase();
-    if (text && !`${r.job.title} ${r.company?.name ?? ''} ${r.location?.city ?? ''}`.toLowerCase().includes(text)) return false;
+    if (text && !`${r.job.title} ${r.job.reference ?? ''} ${r.company?.name ?? ''} ${r.location?.city ?? ''}`.toLowerCase().includes(text)) return false;
     if (statusFilter === 'open' && closed.has(r.job.status)) return false;
     if (statusFilter !== 'open' && statusFilter !== 'all' && r.job.status !== statusFilter) return false;
     const d = daysUntil(r.job.deadline);
@@ -67,42 +64,6 @@
   }
   const ariaSort = (k: ColumnKey) => (sortKey === k ? (sortAsc ? 'ascending' : 'descending') : 'none');
 
-  // ---------- Breite der Tabellenspalte (an der linken Kartenkante ziehbar) ----------
-  const WIDTH_KEY = 'switchtracker.listWidth';
-  const readWidth = () => { try { return Number(localStorage.getItem(WIDTH_KEY)) || 440; } catch { return 440; } };
-  let listWidth = $state(readWidth());
-  let layoutEl: HTMLDivElement;
-
-  function clampWidth(w: number) {
-    const max = Math.max(320, (layoutEl?.clientWidth ?? window.innerWidth) - 280);
-    return Math.round(Math.min(max, Math.max(320, w)));
-  }
-  function saveWidth() { try { localStorage.setItem(WIDTH_KEY, String(listWidth)); } catch { /* privater Modus */ } }
-
-  function startResize(e: PointerEvent) {
-    e.preventDefault();
-    const handle = e.currentTarget as HTMLElement;
-    handle.setPointerCapture(e.pointerId);
-    const left = layoutEl.getBoundingClientRect().left;
-    const onMove = (ev: PointerEvent) => (listWidth = clampWidth(ev.clientX - left));
-    const onUp = () => {
-      handle.removeEventListener('pointermove', onMove);
-      handle.removeEventListener('pointerup', onUp);
-      saveWidth();
-    };
-    handle.addEventListener('pointermove', onMove);
-    handle.addEventListener('pointerup', onUp);
-  }
-
-  function resizeKey(e: KeyboardEvent) {
-    const step = e.shiftKey ? 80 : 20;
-    if (e.key === 'ArrowLeft') listWidth = clampWidth(listWidth - step);
-    else if (e.key === 'ArrowRight') listWidth = clampWidth(listWidth + step);
-    else return;
-    e.preventDefault();
-    saveWidth();
-  }
-
   // ---------- Karte ----------
   /** laufende Nummer jeder sichtbaren Zeile (1–n in aktueller Filterung und Sortierung) */
   const rowNumber = $derived(new Map(visible.map((r, i) => [r.job.id, i + 1])));
@@ -113,8 +74,7 @@
       if (!r.location || !r.coord) continue;
       const n = rowNumber.get(r.job.id)!;
       const p = byLoc.get(r.location.id);
-      if (p) { p.subtitle += `
-${n}. ${r.job.title}`; p.nums.push(n); }
+      if (p) { p.subtitle += `\n${n}. ${r.job.title}`; p.nums.push(n); }
       else byLoc.set(r.location.id, { id: r.location.id, coord: r.coord, title: r.company?.name ?? r.location.city, subtitle: `${n}. ${r.job.title}`, label: '', nums: [n] });
     }
     // mehrere Stellen am selben Standort: bis zu drei Nummern, sonst „2, 5 +3“
@@ -169,8 +129,8 @@ ${n}. ${r.job.title}`; p.nums.push(n); }
   }
 </script>
 
-<div class="overview" bind:this={layoutEl} style:--list-w="{listWidth}px">
-  <section class="list layer">
+<MapLayout>
+  {#snippet list()}
     <div class="controls">
       <HomeBar />
 
@@ -184,19 +144,10 @@ ${n}. ${r.job.title}`; p.nums.push(n); }
         </button>
       </div>
 
-      <label class="radius">
-        <span class="lbl">Radius</span>
-        <input
-          type="number" min="1" step="5" placeholder="alle"
-          value={store.radiusKm ?? ''}
-          onchange={e => setRadius(e.currentTarget.value)}
-          title="Luftlinie um die gewählte Heimadresse; leer = kein Radiusfilter"
-        />
-        <span class="muted small">km Luftlinie um die Heimadresse</span>
-      </label>
+      <RadiusField />
 
       <div class="filters">
-        <input type="search" placeholder="Suche in Titel, Unternehmen, Ort" bind:value={q} aria-label="Suche" />
+        <input type="search" placeholder="Suche in Titel, Kennziffer, Unternehmen, Ort" bind:value={q} aria-label="Suche" />
         <select bind:value={statusFilter} aria-label="Status-Filter">
           <option value="all">Alle Status</option>
           <option value="open">Nur offene</option>
@@ -239,39 +190,27 @@ ${n}. ${r.job.title}`; p.nums.push(n); }
             </tr>
           {:else}
             <tr><td colspan={columns.length + 2} class="muted empty">
-              {store.jobs.length ? 'Keine Stelle passt zu den Filtern.' : 'Noch keine Stellen. Lege im Reiter „Stellen“ eine neue an oder lade in den Einstellungen die Beispieldaten.'}
+              {store.jobs.length ? 'Keine Stelle passt zu den Filtern.' : 'Noch keine Stellen. Lege unter Datenbank → Stellen eine neue an oder lade in den Einstellungen die Beispieldaten.'}
             </td></tr>
           {/each}
         </tbody>
       </table>
     </div>
-  </section>
+  {/snippet}
 
-  <!-- Fokussierbarer Trenner (ARIA „separator“ mit Wert) ist ein bedienbares Element -->
-  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-  <div
-    class="splitter"
-    role="separator"
-    aria-orientation="vertical"
-    aria-label="Breite von Tabelle und Karte ändern"
-    aria-valuenow={listWidth}
-    aria-valuemin={320}
-    tabindex="0"
-    title="Ziehen, um die Karte zu vergrößern oder zu verkleinern"
-    onpointerdown={startResize}
-    onkeydown={resizeKey}
-  ></div>
-
-  <section class="mapcol">
+  {#snippet map()}
     <MapView
       {points}
+      variant="job"
       home={store.activeHomeCoord}
+      homes={store.homeMarkers}
       radiusKm={store.radiusKm}
       selectedId={selected?.location?.id ?? null}
       {route}
       draggableId={correcting ? (selected?.location?.id ?? null) : null}
       onselect={selectLocation}
       onmoved={moved}
+      onhomeclick={id => setSetting('activeHomeId', id)}
     />
 
     {#if selected}
@@ -312,61 +251,15 @@ ${n}. ${r.job.title}`; p.nums.push(n); }
         </div>
       </div>
     {/if}
-  </section>
-</div>
+  {/snippet}
+</MapLayout>
 
 {#if pickingColumns}
-  <ColumnPicker onclose={() => (pickingColumns = false)} />
+  <ColumnPicker
+    columns={COLUMNS}
+    value={store.overviewColumns}
+    defaults={DEFAULT_OVERVIEW_COLUMNS}
+    settingKey="overviewColumns"
+    onclose={() => (pickingColumns = false)}
+  />
 {/if}
-
-<style>
-  .overview {
-    display: grid;
-    grid-template-columns: var(--list-w) 6px 1fr;
-    height: 100%;
-  }
-  .list { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); }
-  .controls { display: flex; flex-direction: column; gap: 12px; padding: 16px 16px 12px; }
-  .head { margin-top: 4px; gap: 0; }
-  .radius { display: grid; grid-template-columns: auto 96px 1fr; align-items: center; gap: 8px; }
-  .lbl { font-size: 12px; letter-spacing: 0.32px; color: var(--muted); }
-  .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); }
-  .filters input { grid-column: 1 / -1; }
-  .table-wrap { flex: 1; overflow: auto; border-top: 1px solid var(--border); }
-  /* kompakte Tabelle: etwas weniger Innenabstand als die volle Carbon-Tabelle */
-  .table-wrap :global(th), .table-wrap :global(td) { padding-left: 12px; padding-right: 12px; }
-  .table-wrap :global(td.act) { width: 1px; padding: 0 4px; }
-  .table-wrap :global(th.nr), .table-wrap :global(td.nr) { width: 1px; padding: 0 0 0 12px; text-align: center; }
-  /* gleiche Optik wie der Marker auf der Karte */
-  .pin {
-    display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 5px;
-    border-radius: 11px; background: #0f62fe; color: #fff; font-size: 11px; font-weight: 600;
-  }
-  .pin.nopin { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--border-strong); }
-  tr.selected .pin:not(.nopin) { background: #ff832b; color: #161616; }
-  .empty { padding: 24px 16px; text-align: center; cursor: default; }
-  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  .splitter {
-    cursor: col-resize; background: var(--border); position: relative; touch-action: none;
-    outline: 2px solid transparent; outline-offset: -2px;
-  }
-  .splitter::after {
-    content: ''; position: absolute; top: 50%; left: 1px; width: 4px; height: 32px; margin-top: -16px;
-    border-left: 1px solid var(--border-strong); border-right: 1px solid var(--border-strong);
-  }
-  .splitter:hover, .splitter:focus-visible { background: var(--accent); }
-  .splitter:focus-visible { outline-color: var(--focus); }
-  .mapcol { position: relative; min-height: 0; min-width: 0; }
-  .info {
-    position: absolute; left: 16px; bottom: 44px; width: min(400px, calc(100% - 32px));
-    display: flex; flex-direction: column; gap: 4px; padding: 16px;
-    background: var(--panel); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  }
-  .facts { display: flex; gap: 16px; flex-wrap: wrap; }
-  .actions { margin-top: 8px; }
-  @media (max-width: 800px) {
-    .overview { grid-template-columns: 1fr; grid-template-rows: auto 60vh; height: auto; }
-    .splitter { display: none; }
-    .table-wrap { max-height: 50vh; }
-  }
-</style>

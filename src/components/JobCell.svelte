@@ -19,6 +19,7 @@
       {r.company?.name ?? 'Kein Unternehmen'}{#if r.location} · {r.location.city}{:else if r.job.workModel === 'homeoffice'} · Homeoffice{/if}
     </div>
   {/if}
+{:else if col === 'reference'}{r.job.reference ?? ''}
 {:else if col === 'company'}{r.company?.name ?? ''}
 {:else if col === 'city'}{r.location?.city ?? ''}
 {:else if col === 'state'}{r.state}

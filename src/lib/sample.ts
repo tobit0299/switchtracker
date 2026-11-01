@@ -35,8 +35,8 @@ export async function loadSampleData() {
   const lWien = location(donau, 'Büro Wien', 'Stephansplatz 1', '1010', 'Wien', 'AT');
 
   const jobs: Job[] = [
-    job('Data Engineer (m/w/d)', isar, lMuenchen, { status: 'beworben', relevance: 5, deadline: inDays(5), followUp: inDays(10) }),
-    job('Projektmanager Digitalisierung', nordlicht, lHamburg, { status: 'gespraech', relevance: 4, followUp: inDays(2) }),
+    job('Data Engineer (m/w/d)', isar, lMuenchen, { reference: 'IA-2026-117', status: 'beworben', relevance: 5, deadline: inDays(5), followUp: inDays(10) }),
+    job('Projektmanager Digitalisierung', nordlicht, lHamburg, { reference: 'NL-PM-04', status: 'gespraech', relevance: 4, followUp: inDays(2) }),
     job('Business Analyst', rhein, lDuesseldorf, { status: 'in_arbeit', relevance: 4, deadline: inDays(12), workModel: 'vor_ort' }),
     job('IT-Systemadministrator', rhein, lBonn, { status: 'interessant', relevance: 3, deadline: inDays(-2) }),
     job('Supply Chain Analyst', nordlicht, lDortmund, { status: 'interessant', relevance: 3, deadline: inDays(20), workModel: 'vor_ort' }),

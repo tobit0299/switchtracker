@@ -56,7 +56,7 @@ export async function deleteCompany(id: string) {
 
 export function emptyJob(): Job {
   return {
-    id: newId(), title: '', url: '', companyId: null, locationId: null, workModel: '',
+    id: newId(), title: '', reference: '', url: '', companyId: null, locationId: null, workModel: '',
     status: 'interessant', relevance: 0, deadline: '', followUp: '', notes: '',
     createdAt: now(), updatedAt: now(),
   };

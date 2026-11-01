@@ -11,7 +11,7 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
 
 ## Befehle
 
-- Versionsnummer in `package.json` bei neuen Funktionen erhöhen (aktuell 0.2.0); sie wird in den Einstellungen angezeigt.
+- Versionsnummer in `package.json` bei neuen Funktionen erhöhen (aktuell 0.3.0); sie wird in den Einstellungen angezeigt.
 
 - `npm run dev`: Entwicklungsserver (Basis `/`)
 - `npm run check`: svelte-check und TypeScript, muss fehlerfrei sein
@@ -23,7 +23,8 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
 - `src/lib/store.svelte.ts`: reaktiver Datenstand aus liveQuerys, abgeleitete Werte (`rows` = Stellen mit Unternehmen, Standort, Luftlinie, Fahrzeit). Lokale Werte wie der ORS-Schlüssel in `prefs` (localStorage).
 - `src/lib/repo.ts`: alle Schreibzugriffe. Komponenten schreiben nie direkt in Dexie.
 - `src/lib/geo/keys.ts`: Adressnormalisierung, Cache-Schlüssel, Luftlinie. `src/lib/geo/services.svelte.ts`: Nominatim-Warteschlange (1/s), ORS-Matrix und -Routen.
-- `src/components/`: ein Reiter je Datei plus `JobDialog`, `CompanyDialog`, `MapView`, `HomeBar`, `StarRating`, `ColumnPicker`, `JobCell`.
+- `src/components/`: Reiter `JobMap` (Stellenkarte), `CompanyMap` (Unternehmenskarte), `DatabaseTab` (Unterreiter `JobsTab`, `CompaniesTab`), `SettingsTab`; dazu `MapLayout` (gemeinsames Layout beider Karten mit ziehbarer Kante, Snippets `list`/`map`), `MapView`, `HomeBar`, `RadiusField`, `ColumnPicker` (generisch), `JobCell`, `LocationCell`, `JobDialog`, `CompanyDialog`, `StarRating`, `AccountSection`.
+- `src/lib/companyColumns.ts`: Spalten und Sortierung der Unternehmenskarte (eine Zeile je Standort, `store.locationRows`).
 - `src/lib/cloud.svelte.ts`: Dexie Cloud (Anmeldung, Sync-Status, Einladungen, gemeinsamer Realm „Unternehmensverzeichnis“). Aktiv nur, wenn `VITE_DEXIE_CLOUD_URL` gesetzt ist (lokal `.env.local`, im Deployment die Repository-Variable `DEXIE_CLOUD_URL`); sonst reiner Gastmodus. `AccountSection` ist die Oberfläche dazu.
 - `src/lib/documents.ts`: Aufbereitung beim Upload (pdf.js, pdf-lib, tesseract.js, alles per dynamischem Import nachgeladen).
 - `src/lib/columns.ts`: gemeinsame Spaltendefinitionen und Sortierung beider Stellentabellen; `JobCell` rendert eine Zelle.
@@ -48,7 +49,7 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
 ## Datenmodell (drei getrennte Bereiche)
 
 1. **Unternehmensverzeichnis (geteilt):** `companies` (Name, Branche, Bewertung, Website, Notizen) und `locations` (Standorte eines Unternehmens, strukturierte Adresse: Straße, PLZ, Ort, Bundesland, Land). Ein Unternehmen hat 1–n Standorte.
-2. **Stellenverzeichnis (pro Nutzer):** `jobs` mit Titel, Stellenlink, Arbeitsmodell, Status (Pipeline), **Relevanz**, Fristen/Wiedervorlage und Notizen.
+2. **Stellenverzeichnis (pro Nutzer):** `jobs` mit Titel, Kennziffer der Ausschreibung (`reference`, optional), Stellenlink, Arbeitsmodell, Status (Pipeline), **Relevanz**, Fristen/Wiedervorlage und Notizen.
    - Verknüpfung zu Unternehmen (`companyId`) und Standort (`locationId`) optional.
    - Remote-Stellen brauchen keinen Standort.
    - `documents`: Dateien zu einer Stelle (z. B. Ausschreibung als PDF), als Blob gespeichert.
@@ -64,17 +65,22 @@ Privates Tool zur Verwaltung von Bewerbungen mit gekoppelter Tabelle und Karte. 
 
 ## Oberfläche (Reiter)
 
-1. **Übersicht (Hauptreiter)**
-   - Linke Spalte, von oben: Heimadresse (Auswahl + „Adresse“), Kopfzeile „Stellen“ mit Knöpfen „Alle Filter zurücksetzen“ und „Spalten auswählen“, Radius (km Luftlinie), Tabellenfilter (Suche, Status, Frist), kompakte Tabelle.
-   - Rechte Spalte: Karte über die volle Höhe. Die Trennkante zwischen Tabelle und Karte ist ziehbar (Breite in localStorage).
+1. **Stellenkarte (Hauptreiter)**
+   - Linke Spalte, von oben: Heimadresse (Auswahl + „Adresse“, bei mehreren Heimadressen Häkchen „Alle Heimadressen auf der Karte zeigen“), Kopfzeile „Stellen“ mit Knöpfen „Alle Filter zurücksetzen“ und „Spalten auswählen“, Radius (km Luftlinie), Tabellenfilter (Suche, Status, Frist), kompakte Tabelle.
+   - Rechte Spalte: Karte über die volle Höhe. Die Trennkante zwischen Tabelle und Karte ist ziehbar (Breite in localStorage, für beide Karten gemeinsam).
    - Spalten der kompakten Tabelle per Popup wählbar und per Ziehen sortierbar (Standard: Titel, Status, Frist), gespeichert als Einstellung `overviewColumns`.
    - Jede Zeile hat eine laufende Nummer (Spalte „#“, 1–n in aktueller Filterung und Sortierung); dieselbe Nummer steht im Marker auf der Karte. Mehrere Stellen am selben Standort: bis zu drei Nummern, sonst z. B. „2, 5 +3“. Stellen ohne Kartenposition haben eine umrandete Nummer.
-   - Klick auf eine Stelle: Standort wird auf der Karte hervorgehoben. Kein „Neue Stelle“-Knopf hier (nur im Reiter „Stellen“).
+   - Marker der Stellenkarte sind **blau**; Auswahl = größer mit dunklem Ring. Routenlinie lila.
+   - Heimadressen als **Haus-Symbol**: aktive grün, weitere grau (nur mit Häkchen sichtbar); Klick auf ein graues Haus macht es zur aktiven Heimadresse.
+   - Klick auf eine Stelle: Standort wird auf der Karte hervorgehoben. Kein „Neue Stelle“-Knopf hier (nur unter Datenbank → Stellen).
    - Die Karte passt sich an neu hinzukommende Punkte an, bis der Nutzer sie selbst verschiebt oder zoomt.
    - „Details“ (Augen-Symbol): vollständige Stelleninformationen, Notizfeld und Dokumentenablage.
-2. **Stellen:** vollständige Tabelle mit allen Feldern („Relevanz Stelle“, „Bewertung Unternehmen“), Filter, „Neue Stelle“.
-3. **Unternehmen:** vollständige Tabelle mit Unternehmen und Standorten.
+2. **Unternehmenskarte:** gleiches Layout, eine Zeile je Standort des Unternehmensverzeichnisses, Marker **orange**. Filter: Suche, Branche, Bewertung ab, „mit/ohne eigene Stellen“, Radius. Eigene Spaltenauswahl (`companyMapColumns`, Standard: Unternehmen, Ort, Bewertung). Infokasten mit Luftlinie, Fahrzeit, Anzahl eigener Stellen, Route und „Unternehmen öffnen“.
+3. **Datenbank** mit Unterreitern:
+   - **Stellen:** vollständige Tabelle mit allen Feldern („Kennziffer“, „Relevanz Stelle“, „Bewertung Unternehmen“), Filter, „Neue Stelle“. Auswahl „Luftlinie und Fahrzeit ab“ (setzt die aktive Heimadresse); die Spaltenköpfe nennen die Bezugsadresse.
+   - **Unternehmen:** vollständige Tabelle mit Unternehmen und Standorten.
 4. **Einstellungen:** kein Reiter, sondern Zahnrad oben rechts. ORS-Schlüssel, Konto und Synchronisation, Profil, Heimadressen, Dokumente (Komprimierung/OCR), Karte („Position korrigieren“ an/aus, Standard aus), Backup. Ganz unten die Versionsanzeige: Version aus `package.json`, Commit (lokal per `git`, im Deployment aus `GITHUB_SHA`) und Build-Zeitpunkt, eingesetzt über `define` in `vite.config.ts`.
+- Fahrzeiten werden für alle Standorte des Verzeichnisses berechnet (nicht nur für solche mit Stellen), weil die Unternehmenskarte sie anzeigt.
 
 ## Technische Richtung
 
@@ -97,8 +103,10 @@ Im Browser getestet am 19.10.2026 (Entwicklungsserver und Produktionsbuild); Üb
 - Carbon-Design in hell und dunkel (folgt der Systemeinstellung).
 - Fristen-Hervorhebung (überfällig rot, innerhalb von 7 Tagen orange).
 - Stellendetails öffnen, bearbeiten und speichern, inklusive Notizen und Relevanz.
-- Reiter „Stellen“: vollständige Tabelle mit allen Filtern und Sortierung.
-- Reiter „Unternehmen“: Tabelle mit Suche und Sortierung.
+- Datenbank → Stellen: vollständige Tabelle mit allen Filtern und Sortierung, Kennziffer, Bezugsadresse für Luftlinie/Fahrzeit wählbar und in den Spaltenköpfen sichtbar.
+- Datenbank → Unternehmen: Tabelle mit Suche und Sortierung.
+- Unternehmenskarte mit orangen, nummerierten Markern, Filtern, Spaltenauswahl und Infokasten (geprüft 01.11.2026).
+- Heimadressen als Haus-Symbole, „Alle Heimadressen zeigen“ (aktiv grün, weitere grau).
 - Produktionsbuild unter `/switchtracker/` mit Karte, MapLibre-Worker und Service Worker (offline-fähig).
 - Deployment per GitHub Actions bei jedem Push auf `main` (Actions-Berechtigung: nur eigene und von GitHub erstellte Actions erlaubt).
 - Versionsanzeige unten in den Einstellungen (Version, Commit, Build-Zeitpunkt).

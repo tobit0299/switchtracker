@@ -39,6 +39,12 @@
     </select>
     <button class="secondary" title="Weitere Heimadresse speichern" onclick={() => (adding = true)}><Add size={16} /> Adresse</button>
   </div>
+  {#if store.homes.length > 1}
+    <label class="row allhomes small">
+      <input type="checkbox" checked={store.showAllHomes} onchange={e => setSetting('showAllHomes', e.currentTarget.checked)} />
+      Alle Heimadressen auf der Karte zeigen
+    </label>
+  {/if}
 {/if}
 {#if homeGeo && !homeGeo.found}
   <div class="notice error small">Die Heimadresse wurde nicht gefunden. Bitte in den Einstellungen unter Heimadressen korrigieren.</div>
@@ -51,4 +57,5 @@
   .add { display: flex; flex-direction: column; gap: 8px; }
   .add .lbl { margin-bottom: 0; }
   .notice { margin-top: 8px; }
+  .allhomes { margin-top: 8px; gap: 8px; cursor: pointer; color: var(--muted); }
 </style>

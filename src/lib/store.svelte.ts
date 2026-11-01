@@ -1,5 +1,6 @@
 import { liveQuery } from 'dexie';
 import { columnByKey, DEFAULT_OVERVIEW_COLUMNS, type ColumnKey } from './columns';
+import { companyColumnByKey, DEFAULT_COMPANY_MAP_COLUMNS, type CompanyColumnKey } from './companyColumns';
 import { db, geoDb } from './db';
 import { addressKey, haversineKm, locationAddress, travelKey } from './geo/keys';
 import type { Company, Coord, Geocode, Home, Job, Location, Profile, Travel } from './types';
@@ -36,6 +37,20 @@ class Store {
   docTextByJob = $state.raw<Map<string, string>>(new Map());
   /** „Position korrigieren“ (Marker ziehen) ist standardmäßig aus */
   allowPositionCorrection = $derived(this.settings.allowPositionCorrection === true);
+  /** alle Heimadressen auf der Karte zeigen (sonst nur die aktive) */
+  showAllHomes = $derived(this.settings.showAllHomes === true);
+  /** Heimadressen mit Koordinaten für die Karte */
+  homeMarkers = $derived(this.homes.flatMap(h => {
+    const coord = this.coordForAddress(h.address);
+    const active = h.id === this.activeHomeId;
+    return coord && (active || this.showAllHomes) ? [{ id: h.id, coord, name: h.name, active }] : [];
+  }));
+  /** sichtbare Spalten der kompakten Tabelle der Unternehmenskarte */
+  companyMapColumns = $derived.by<CompanyColumnKey[]>(() => {
+    const v = this.settings.companyMapColumns;
+    const valid = Array.isArray(v) ? (v as CompanyColumnKey[]).filter(k => companyColumnByKey.has(k)) : [];
+    return valid.length ? valid : DEFAULT_COMPANY_MAP_COLUMNS;
+  });
   /** sichtbare Spalten der kompakten Tabelle in der Übersicht, in Anzeigereihenfolge */
   overviewColumns = $derived.by<ColumnKey[]>(() => {
     const v = this.settings.overviewColumns;
@@ -88,6 +103,32 @@ class Store {
       travel: this.travelForLocation(location),
     };
   }));
+
+  /** Standorte des Unternehmensverzeichnisses für die Unternehmenskarte */
+  locationRows = $derived.by<LocationRow[]>(() => {
+    const jobsPerLocation = new Map<string, number>();
+    for (const j of this.jobs) if (j.locationId) jobsPerLocation.set(j.locationId, (jobsPerLocation.get(j.locationId) ?? 0) + 1);
+    return this.locations.map(location => ({
+      location,
+      company: this.companyById.get(location.companyId) ?? null,
+      coord: this.coordForLocation(location),
+      state: this.stateForLocation(location),
+      airKm: this.airKmForLocation(location),
+      travel: this.travelForLocation(location),
+      jobCount: jobsPerLocation.get(location.id) ?? 0,
+    }));
+  });
+}
+
+export interface LocationRow {
+  location: Location;
+  company: Company | null;
+  coord: Coord | null;
+  state: string;
+  airKm: number | null;
+  travel: Travel | null;
+  /** Anzahl eigener Stellen an diesem Standort */
+  jobCount: number;
 }
 
 export interface JobRow {

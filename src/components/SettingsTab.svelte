@@ -187,7 +187,7 @@
       Texterkennung (OCR) für gescannte PDFs und Fotos
     </label>
     <p class="muted small">
-      Der erkannte Text wird beim Dokument gespeichert und ist im Reiter „Stellen“ durchsuchbar. Die Erkennung läuft
+      Der erkannte Text wird beim Dokument gespeichert und ist unter Datenbank → Stellen durchsuchbar. Die Erkennung läuft
       im Browser; beim ersten Mal werden die Sprachdaten (Deutsch, Englisch) einmalig geladen, die Dokumente selbst
       verlassen das Gerät nicht.
     </p>

@@ -1,9 +1,9 @@
 import type { JobRow } from './store.svelte';
 import { STATUSES } from './types';
 
-/** Spalten der Stellentabellen (Übersicht und Reiter „Stellen“). */
+/** Spalten der Stellentabellen (Stellenkarte und Datenbank → Stellen). */
 export type ColumnKey =
-  | 'title' | 'company' | 'city' | 'state' | 'country' | 'status' | 'relevance' | 'rating'
+  | 'title' | 'reference' | 'company' | 'city' | 'state' | 'country' | 'status' | 'relevance' | 'rating'
   | 'deadline' | 'followUp' | 'air' | 'travel' | 'workModel' | 'industry';
 
 export interface ColumnDef {
@@ -16,6 +16,7 @@ export interface ColumnDef {
 
 export const COLUMNS: ColumnDef[] = [
   { key: 'title', label: 'Titel' },
+  { key: 'reference', label: 'Kennziffer' },
   { key: 'company', label: 'Unternehmen' },
   { key: 'city', label: 'Ort' },
   { key: 'state', label: 'Bundesland' },
@@ -42,6 +43,7 @@ const statusOrder = new Map(STATUSES.map((s, i) => [s.value, i]));
 export function sortValue(r: JobRow, k: ColumnKey): string | number | null {
   switch (k) {
     case 'title': return r.job.title;
+    case 'reference': return r.job.reference || null;
     case 'company': return r.company?.name ?? null;
     case 'city': return r.location?.city ?? null;
     case 'state': return r.state || null;

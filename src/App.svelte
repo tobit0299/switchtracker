@@ -1,9 +1,9 @@
 <script lang="ts">
-  import CompaniesTab from './components/CompaniesTab.svelte';
   import CompanyDialog from './components/CompanyDialog.svelte';
+  import CompanyMap from './components/CompanyMap.svelte';
+  import DatabaseTab from './components/DatabaseTab.svelte';
   import JobDialog from './components/JobDialog.svelte';
-  import JobsTab from './components/JobsTab.svelte';
-  import Overview from './components/Overview.svelte';
+  import JobMap from './components/JobMap.svelte';
   import SettingsTab from './components/SettingsTab.svelte';
   import { homeGeoRequest, locationGeoRequest } from './lib/geo/keys';
   import { geoStatus, requestGeocodes, requestTravel } from './lib/geo/services.svelte';
@@ -14,9 +14,9 @@
   import { cloud, login } from './lib/cloud.svelte';
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'overview', label: 'Übersicht' },
-    { id: 'jobs', label: 'Stellen' },
-    { id: 'companies', label: 'Unternehmen' },
+    { id: 'jobMap', label: 'Stellenkarte' },
+    { id: 'companyMap', label: 'Unternehmenskarte' },
+    { id: 'database', label: 'Datenbank' },
   ];
 
   // Hinweis, falls der erste Start (Dexie Cloud wartet auf den ersten Abgleich) hängt
@@ -29,12 +29,12 @@
     requestGeocodes([...store.homes.map(h => homeGeoRequest(h.address)), ...store.locations.map(locationGeoRequest)]);
   });
 
-  // Fehlende Fahrzeiten ab der aktiven Heimadresse berechnen, nur für Standorte mit Stellen
+  // Fehlende Fahrzeiten ab der aktiven Heimadresse für alle Standorte berechnen (Stellen- und Unternehmenskarte)
   $effect(() => {
     const from = store.activeHomeCoord;
     const key = prefs.orsKey;
     if (!store.loaded || !from || !key) return;
-    const targets = store.rows.map(r => r.coord).filter(c => c != null);
+    const targets = store.locationRows.map(r => r.coord).filter(c => c != null);
     const timer = setTimeout(() => requestTravel(from, targets), 600);
     return () => clearTimeout(timer);
   });
@@ -96,12 +96,12 @@
           {#if cloud.syncError}Fehler: {cloud.syncError}. {/if}Bitte die Verbindung prüfen; die App lädt weiter, sobald der Server erreichbar ist.
         </p>
       {/if}
-    {:else if ui.tab === 'overview'}
-      <Overview />
-    {:else if ui.tab === 'jobs'}
-      <JobsTab />
-    {:else if ui.tab === 'companies'}
-      <CompaniesTab />
+    {:else if ui.tab === 'jobMap'}
+      <JobMap />
+    {:else if ui.tab === 'companyMap'}
+      <CompanyMap />
+    {:else if ui.tab === 'database'}
+      <DatabaseTab />
     {:else}
       <SettingsTab />
     {/if}

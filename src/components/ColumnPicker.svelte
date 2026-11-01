@@ -1,23 +1,29 @@
 <script lang="ts">
   import Draggable from 'carbon-icons-svelte/lib/Draggable.svelte';
   import { onMount } from 'svelte';
-  import { COLUMNS, DEFAULT_OVERVIEW_COLUMNS, columnByKey, type ColumnKey } from '../lib/columns';
   import { setSetting } from '../lib/repo';
-  import { store } from '../lib/store.svelte';
 
-  let { onclose }: { onclose: () => void } = $props();
+  /** Spaltenauswahl für eine kompakte Tabelle; gespeichert unter `settingKey`. */
+  let { columns, value, defaults, settingKey, onclose }: {
+    columns: { key: string; label: string }[];
+    value: string[];
+    defaults: string[];
+    settingKey: string;
+    onclose: () => void;
+  } = $props();
 
-  type Item = { key: ColumnKey; label: string; visible: boolean };
+  type Item = { key: string; label: string; visible: boolean };
 
   /** sichtbare Spalten in ihrer Reihenfolge, danach die ausgeblendeten */
-  function itemsFor(visible: ColumnKey[]): Item[] {
-    const shown = visible.map(k => ({ key: k, label: columnByKey.get(k)!.label, visible: true }));
-    const hidden = COLUMNS.filter(c => !visible.includes(c.key)).map(c => ({ key: c.key, label: c.label, visible: false }));
+  function itemsFor(visible: string[]): Item[] {
+    const label = (k: string) => columns.find(c => c.key === k)?.label ?? k;
+    const shown = visible.map(k => ({ key: k, label: label(k), visible: true }));
+    const hidden = columns.filter(c => !visible.includes(c.key)).map(c => ({ key: c.key, label: c.label, visible: false }));
     return [...shown, ...hidden];
   }
 
   // svelte-ignore state_referenced_locally
-  let items = $state<Item[]>(itemsFor(store.overviewColumns));
+  let items = $state<Item[]>(itemsFor(value));
   let dragIndex = $state<number | null>(null);
   let dialog: HTMLDialogElement;
   const visibleCount = $derived(items.filter(i => i.visible).length);
@@ -47,7 +53,7 @@
   }
 
   async function apply() {
-    await setSetting('overviewColumns', items.filter(i => i.visible).map(i => i.key));
+    await setSetting(settingKey, items.filter(i => i.visible).map(i => i.key));
     dialog.close();
   }
 </script>
@@ -81,7 +87,7 @@
     </ul>
   </div>
   <footer>
-    <button class="ghost" onclick={() => (items = itemsFor(DEFAULT_OVERVIEW_COLUMNS))}>Standard</button>
+    <button class="ghost" onclick={() => (items = itemsFor(defaults))}>Standard</button>
     <span class="grow"></span>
     <button class="secondary" onclick={() => dialog.close()}>Abbrechen</button>
     <button onclick={apply}>Übernehmen</button>

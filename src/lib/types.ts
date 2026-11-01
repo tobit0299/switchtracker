@@ -50,6 +50,8 @@ export type WorkModel = '' | 'vor_ort' | 'hybrid' | 'homeoffice';
 export interface Job {
   id: string;
   title: string;
+  /** unternehmensinterne Kennziffer der Stellenausschreibung (fehlt bei älteren Einträgen) */
+  reference?: string;
   url: string;
   companyId: string | null;
   locationId: string | null;

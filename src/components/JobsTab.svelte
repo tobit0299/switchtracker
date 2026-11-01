@@ -2,7 +2,7 @@
   import Add from 'carbon-icons-svelte/lib/Add.svelte';
   import FilterRemove from 'carbon-icons-svelte/lib/FilterRemove.svelte';
   import { COLUMNS, columnByKey, compareRows, type ColumnKey } from '../lib/columns';
-  import { emptyJob } from '../lib/repo';
+  import { emptyJob, setSetting } from '../lib/repo';
   import { prefs, store, type JobRow } from '../lib/store.svelte';
   import { COUNTRIES, STATUSES, WORK_MODELS } from '../lib/types';
   import { ui } from '../lib/ui.svelte';
@@ -25,7 +25,7 @@
 
   function matches(r: JobRow): boolean {
     const text = q.trim().toLowerCase();
-    if (text && !`${r.job.title} ${r.company?.name ?? ''} ${r.location?.city ?? ''} ${r.job.notes} ${store.docTextByJob.get(r.job.id) ?? ''}`.toLowerCase().includes(text)) return false;
+    if (text && !`${r.job.title} ${r.job.reference ?? ''} ${r.company?.name ?? ''} ${r.location?.city ?? ''} ${r.job.notes} ${store.docTextByJob.get(r.job.id) ?? ''}`.toLowerCase().includes(text)) return false;
     if (status === 'open' && closed.has(r.job.status)) return false;
     if (status !== 'open' && status !== 'all' && r.job.status !== status) return false;
     if (workModel && r.job.workModel !== workModel) return false;
@@ -65,7 +65,7 @@
   </div>
 
   <div class="filters card">
-    <input type="search" class="search" placeholder="Suche in Titel, Unternehmen, Ort, Notizen und Dokumenten" bind:value={q} />
+    <input type="search" class="search" placeholder="Suche in Titel, Kennziffer, Unternehmen, Ort, Notizen und Dokumenten" bind:value={q} />
     <label class="field">Status
       <select bind:value={status}>
         <option value="open">Offene</option>
@@ -109,6 +109,13 @@
         {#each COUNTRIES as c (c.value)}<option value={c.value}>{c.label}</option>{/each}
       </select>
     </label>
+    <label class="field home" title="Bezugspunkt für die Spalten Luftlinie und Fahrzeit sowie den Fahrzeitfilter">
+      Luftlinie und Fahrzeit ab
+      <select value={store.activeHomeId} onchange={e => setSetting('activeHomeId', e.currentTarget.value)} disabled={!store.homes.length}>
+        {#if !store.homes.length}<option value={null}>keine Heimadresse</option>{/if}
+        {#each store.homes as h (h.id)}<option value={h.id}>{h.name}</option>{/each}
+      </select>
+    </label>
     <label class="field" title={prefs.orsKey ? 'Nur Stellen mit berechneter Fahrzeit ab der aktiven Heimadresse' : 'Benötigt einen OpenRouteService-Schlüssel'}>
       Fahrzeit bis (min)
       <input type="number" min="5" step="5" placeholder="alle" bind:value={maxMinutes} disabled={!prefs.orsKey} />
@@ -123,6 +130,7 @@
           {#each COLUMNS as c (c.key)}
             <th class="sortable" class:num={c.num} aria-sort={sortKey === c.key ? (sortAsc ? 'ascending' : 'descending') : 'none'} onclick={() => sortBy(c.key)}>
               {c.label}{sortKey === c.key ? (sortAsc ? ' ▲' : ' ▼') : ''}
+              {#if (c.key === 'air' || c.key === 'travel') && store.activeHome}<span class="ref">ab {store.activeHome.name}</span>{/if}
             </th>
           {/each}
         </tr>
@@ -140,7 +148,10 @@
       </tbody>
     </table>
   </div>
-  <p class="muted small">Luftlinie und Fahrzeit beziehen sich auf die aktive Heimadresse{store.activeHome ? ` „${store.activeHome.name}“` : ''}.</p>
+  <p class="muted small">
+    Luftlinie und Fahrzeit beziehen sich auf die Heimadresse {store.activeHome ? `„${store.activeHome.name}“ (${store.activeHome.address})` : '– noch keine angelegt'}.
+    Umschalten über „Luftlinie und Fahrzeit ab“ oben; bereits berechnete Fahrzeiten werden je Heimadresse gespeichert.
+  </p>
 </div>
 
 <style>
@@ -149,6 +160,7 @@
   .search { grid-column: 1 / -1; }
   .table-wrap { padding: 0; overflow: auto; flex: 1; min-height: 240px; }
   .title { min-width: 200px; }
+  .ref { display: block; font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0.32px; }
   .empty { padding: 24px; text-align: center; cursor: default; }
   td { white-space: nowrap; }
   td.title { white-space: normal; }

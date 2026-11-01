@@ -109,7 +109,10 @@
     </header>
 
     <div class="grid">
-      <label class="field wide">Titel<input bind:value={job.title} required /></label>
+      <label class="field">Titel<input bind:value={job.title} required /></label>
+      <label class="field" title="Unternehmensinterne Kennziffer bzw. Referenznummer der Stellenausschreibung">Kennziffer der Ausschreibung
+        <input bind:value={job.reference} placeholder="z. B. REF-2026-0815" />
+      </label>
 
       <label class="field">Unternehmen
         <select bind:value={job.companyId} onchange={onCompanyChange}>
