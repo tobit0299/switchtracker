@@ -100,6 +100,8 @@ Im Browser getestet am 19.10.2026 (Entwicklungsserver und Produktionsbuild); Üb
 - Reiter „Stellen“: vollständige Tabelle mit allen Filtern und Sortierung.
 - Reiter „Unternehmen“: Tabelle mit Suche und Sortierung.
 - Produktionsbuild unter `/switchtracker/` mit Karte, MapLibre-Worker und Service Worker (offline-fähig).
+- Deployment per GitHub Actions bei jedem Push auf `main` (Actions-Berechtigung: nur eigene und von GitHub erstellte Actions erlaubt).
+- Versionsanzeige unten in den Einstellungen (Version, Commit, Build-Zeitpunkt).
 - Fahrzeit-Matrix und Route über OpenRouteService wurden im Machbarkeitstest (`spike/`) mit echtem Schlüssel bestätigt.
 - Dokument-Aufbereitung beim Upload (getestet 30.10.2026 per Skript im Browser): gescanntes PDF 1,08 MB → 183 KB mit fehlerfreier OCR (deu+eng); Text-PDF verlustfrei verkleinert, Text aus der Textebene; Foto komprimiert und erkannt. OCR braucht beim ersten Mal ca. 1–2 Minuten zum Laden der Sprachdaten (mit Prozentanzeige), danach wenige Sekunden. Erkannter Text ist im Detaildialog einblendbar und im Reiter „Stellen“ durchsuchbar. Beides in den Einstellungen abschaltbar.
 
@@ -111,10 +113,9 @@ Umgesetzt, aber noch nicht getestet oder nur teilweise fertig:
 - **Position korrigieren** (Marker ziehen): implementiert, standardmäßig aus, das Verschieben selbst ist nicht getestet.
 - **Unternehmensdialog:** Anlegen, Bearbeiten, Standorte, Dublettenhinweise und „Erneut suchen“ implementiert, nicht durchgeklickt.
 - **Backup:** JSON-Export und -Wiederherstellung, „Alle Daten löschen“ und „Geodaten-Cache leeren“ implementiert, nicht getestet. Backups sind nur manuell möglich.
-- **Dexie Cloud:** vollständig implementiert (Anmeldung, Sync, gemeinsames Unternehmensverzeichnis mit Einladung), aber **noch nicht gegen eine echte Datenbank getestet**, weil der Nutzer sie erst anlegen muss (`npx dexie-cloud create`, Ursprünge freigeben, Repository-Variable `DEXIE_CLOUD_URL`; siehe README). Getestet: App ohne URL unverändert; mit unerreichbarer URL hängt der erste Start beim Laden (Hinweis nach 8 s).
+- **Dexie Cloud:** Datenbank `https://z9j3u4eev.dexie.cloud` ist angelegt, als Repository-Variable `DEXIE_CLOUD_URL` hinterlegt und live eingebunden (01.11.2026: erster Abgleich auf GitHub Pages erfolgreich, App lädt). **Noch nicht getestet:** Anmeldung, Übernahme der Gastdaten, gemeinsames Verzeichnis, Einladung und Annahme durch die zweite Person. Sperre gegen Fremdregistrierungen fehlt weiterhin.
 - **Dokumenten-Upload über den Dateidialog** selbst (das Browser-Pane kann keine Dateien wählen); Aufbereitung und Anzeige sind getestet.
 - **Profil:** Name und E-Mail werden nur lokal gespeichert und haben keine weitere Funktion.
-- **Deployment:** Workflow ist vorhanden; GitHub Pages muss im Repo auf „GitHub Actions“ gestellt werden, der erste Lauf wurde noch nicht geprüft.
 - **Mobile Ansicht:** Layout bricht unter 800 px um, ist aber nicht gezielt auf Smartphones getestet.
 
 ## Zukünftige Features
